@@ -1,0 +1,13 @@
+{
+  name: 'simone-realtime',
+  author: '',
+  clients: {
+    controller: {
+      target: 'browser',
+      default: true,
+    },
+    satellite: {
+      target: 'node',
+    },
+  },
+}
