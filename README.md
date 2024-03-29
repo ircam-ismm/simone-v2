@@ -1,111 +1,101 @@
-# `simone-realtime`
+# `simone-v2`
 
-Thanks for using soundworks!
+_Simone_ is a web interface for musical improvisation with distributed systems of devices using synthesis by audio mosaicing and audio inputs.
 
-If you are developping an appliction using `soundworks`, let us know by filling a comment there [https://github.com/collective-soundworks/soundworks/discussions/61](https://github.com/collective-soundworks/soundworks/discussions/61)
+This is the second version of _Simone_. The first version can be found [here](https://github.com/ircam-ismm/simone).
 
-## Links
+_Simone_ is developped using the [*soundworks*](https://github.com/collective-soundworks/soundworks/) framework.
 
-- [General Documentation / Tutorials](https://soundworks.dev/)
-- [API](https://soundworks.dev/api)
-- [Examples](https://github.com/collective-soundworks/soundworks-examples)
-- [Issue Tracker](https://github.com/collective-soundworks/soundworks/issues)
-- [Working with Max/MSP](https://github.com/collective-soundworks/soundworks-max)
+## Installation
 
-## Soundworks wizard
+Install `Node.js` (LTS version)
 
-The soundworks wizard is a interactive command line tool that gives you access to a bunch of high-level functionnalities, such as:
-- configure and create new clients
-- install / uninstall plugins and related libraries
-- find some documentation
-- create environment config files
-- etc.
-
-```bash
-npx soundworks
-```
-
-## Available npm scripts
-
-#### `npm run dev`
-
-Launch the application in development mode. Watch file system, transpile and bundle files on change (i.e. when a source file is saved), and restart the server when needed.
-
-#### `npm run build`
-
-Build the application. Transpile and bundle the source code without launching the server.
-
-#### `npm run build:prod`
-
-Build the application for production. Same as `npm run build` but additionally creates minified files for browser clients.
-
-#### `npm run start`
-
-Launch the server without rebuilding the application. Basically a shortcut for `node ./.build/server/index.js`.
-
-#### `npm run watch [name]` _(node clients only)_
-
-Launch the `[name]` client and restart when the sources are updated. 
-
-For example, if you are developping an application with a node client, you should run the `dev` script (to build the source and start the server) in one terminal:
-
-```bash
-npm run dev
-```
-
-And launch and watch the node client(s) (e.g. called `thing`) in another terminal:
-
-```bash
-npm run watch thing
-```
-
-## Environment variables
-
-#### `ENV`
-
-Define which environment config file should be used to run the application. Environment config files are located in the `/config/env` directory. 
-
-For example, given the following config files:
+Clone the repo or download it to the location you want on your computer then in the terminal: 
 
 ```
-├─ config
-│  ├─ env
-│  │  ├─ default.js
-│  │  └─ prod.js   
+cd /path/to/simone
+npm install
+npm run build
 ```
 
-To start the server the `/config/env/prod.js` configuration file, you should run:
+## Starting the server
 
-```bash
-ENV=prod npm run start
-``` 
+You will first need to create a config file for your application.
+To do that, execute the following command `npx soundworks` and choose the `create a new environment config file`.
 
-By default, the `/config/env/default.json` configuration file is used.
+Once this is done, execute
 
-#### `PORT`
-
-Override the port defined in the config file. 
-
-For example, to launch the server on port `3000` whatever the `port` value defined in the default configuration file, you should run:
-
-```bash
-PORT=3000 npm run start
+```
+npm run start
 ```
 
-#### `EMULATE` _(node clients only)_
+This should start the server and prints several IP adresses like this: 
 
-Run several node client instances in parallel in the same terminal window. 
-
-For example, to launch 4 instances of the client `thing` in parallel (each client instance being run inside its own `fork`), you should run:
-
-```bash
-EMULATE=4 npm run watch:process thing
+```
++ https server listening on
+    https://127.0.0.1:8000
+    https://XXX.XXX.XXX.XXX:8000
 ```
 
-## Credits
+## Putting sound in the soundbank
 
-[soundworks](https://soundworks.dev) is a framework developped by the ISMM team at Ircam
+You will need to put soundfiles in the `simone/public/soundbank/` folder to be used by the application. Do not put them in any subfolders.
+
+_Simone_ only support `wav` and `mp3` formats.
+
+## How it works
+
+The Web client provides you with a interface that controls a sound synthesis process based on audio inputs from your microphone.
+The recorded sound is then transformed through a process of 'audio mosaicing' and played on the _Node_ clients connected to the server.
+
+Audio mosaicing refers to the process of recomposing the temporal evolution of a given target audio file from segments cut out of source audio materials. (cf. http://recherche.ircam.fr/equipes/temps-reel/audio-mosaicking/).
+
+To go into more details, your input (called the _target_ sound) is cut into small segments and for each of these segments we look for the 'most similar' segment in another sound (the _source_ sound).
+The resulting sound then sound like the _target_ sound but reconstructed from patches from the _source_ sound.
+
+In _Simone_ the _target_ sound is recorded by the microphone and the data from this _target_ sound is sent simultaneously to all connected _Node_ clients which can use a different _source_ sound.
+
+Two modes of control are available in _Simone_ :  
+1) A *real-time* mode in which audio input from the microphone is processed in real-time.
+2) An *offline* mode (not yet available) in which a pre-recorded sound is used to control synthesis.
+
+## The interface
+
+![](./public/images/interface.png)
+
+The interface in divided in 3 parts
+
+### Top panel: audio input
+The top panel differs depending on the selected mode 
+
+#### in real-time mode
+In real-time mode, the top panel allows you to open the input stream from your microphone, to monitor the input level from your microphone and to calibrate the input sound 
+
+Calibration is an essential part as it will determine normalization value to use when analyzing the input sound. Poor calibration will probably lead to incoherent results in the mosaicing process. 
+To calibrate your sound, press the record button in the calibration section. This will start recording. Press again to stop recording and press the `compute` button to compute the calibration values. These values will be saved in a file (rename it if it is useful) in the `public/calibration` folder. You can load previous calibration files using the dropdown menu and the `load` button.
+It is recommended that you record a calibration sound that encompasses the whole breadth (in volume, pitch, timbre, etc...) of the sound you intend to use when playing later.
+
+#### in offline mode
+
+### Left panel: groups and clients
+The left panel allows you to monitor connected clients, to create groups of clients and to assign clients to groups.
+
+The first part allows you to manage groups of clients. Groups will be used to control synthesis parameters. Clients assigned to the same group will share the same set of parameters and will play the same sound.
+Use the `+` button to create a group. You can rename groups, assign a color to them and delete them. Upon creation, a control box for this group will be created in the right pansel.
+
+The second part monitors all clients connected to the server. You can assign a group to a client using a dropdown menu. A client will not play sound until assigned to a group.
+
+### Right panel: synthesis controls
+This is the main playing part of _Simone_. The right panel displays a box for each group you create. This box contains elements that control the synthesis for each client assigned to this group.
+The elements are the following :
+
+- A play/stop button to start/stop synthesis
+- A dropdown menu to select the _source_ sound used by this group
+- A slider to control volume
+- A slider to control the pitch of the sound (from -1 octave to +1 octave)
+- A slider to control the period between two grains 
+- A slider to control the duration of each grain
+- A slider to randomize the result of the search for the most similar grain. A value of _n_ means that the _source_ grain played will be randomly selected among the _n_ most similar grains to the _target_ grain. 
 
 ## License
-
-[BSD-3-Clause](./LICENSE)
+BSD-3-Clause
