@@ -96,6 +96,7 @@ async function bootstrap() {
       switch (key) {
         case 'reboot': {
           execSync('sudo reboot now');
+          break;
         }
         case 'group': {
           if (group) {
@@ -143,10 +144,16 @@ async function bootstrap() {
                 }
               });
             }, true);
+            group.onDetach(() => {
+              group = null;
+              synthesisEngine.playing = false;
+            });
           } else {
             group = null;
             synthesisEngine.playing = false;
           }
+          // console.log("after", group);
+          break;
         }
       }
     })

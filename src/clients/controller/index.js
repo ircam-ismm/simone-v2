@@ -279,6 +279,20 @@ async function main($container) {
   satellites.onUpdate(() => renderApp());
   satellites.onDetach(() => renderApp());
 
+  const deleteAllGroups = () => {
+    groups.forEach(group => {
+      global.set({ deleteGroup: group.id });
+    });
+  }
+
+  const createSingleGroup = () => {
+    global.set({ createSingleGroup: true });
+  }
+
+  const createOneGroupPerClient = () => {
+    global.set({ createOneGroupPerClient: true });
+  }
+
   // updates/subscribe
   controller.onUpdate(updates => {
     Object.entries(updates).forEach(([key, value]) => {
@@ -455,9 +469,34 @@ async function main($container) {
               <sc-button
                 style="
                   width: 100%;
+                  margin-bottom: 10px;
                 "
                 @release=${e => global.set({ createGroup: true })}
               >+</sc-button>
+              <sc-button
+                style="
+                  width: 100%;
+                "
+                @release=${e => deleteAllGroups()}
+              >delete all groups</sc-button>
+              <sc-button
+                style="
+                  width: 100%;
+                "
+                @release=${e => {
+                  deleteAllGroups();
+                  createSingleGroup();
+                }}
+              >single group</sc-button>
+              <sc-button
+                style="
+                  width: 100%;
+                "
+                @release=${e => {
+                  deleteAllGroups();
+                  createOneGroupPerClient();
+                }}
+              >one group per client</sc-button>
             </div>
             <h2>clients</h2>
             <div>

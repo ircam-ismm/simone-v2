@@ -137,6 +137,8 @@ filesystemSoundbank.onUpdate(async updates => {
 const global = await server.stateManager.create('global');
 const groups = new Map();
 
+const satellites = await server.stateManager.getCollection('satellite');
+
 global.onUpdate(update => {
   Object.entries(update).forEach(async ([key, value]) => {
     switch (key) {
@@ -157,6 +159,55 @@ global.onUpdate(update => {
         });
 
         groups.set(group.id, group);
+        break;
+      }
+      case 'createSingleGroup': {
+        const group = await server.stateManager.create('group');
+        group.set({ name: `group-${group.id}` });
+        group.onUpdate(updates => {
+          if ('sourceName' in updates) {
+            const sourceNameSplit = updates.sourceName.split('.')[0];
+            const analysisFilename = `data_analysis_${sourceNameSplit}.json`
+            const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
+            const analysisData = fs.readFileSync(pathData, 'utf8');
+            group.set({
+              sourceData: {
+                name: updates.sourceName,
+                data: analysisData
+              }
+            });
+          }
+        });
+
+        groups.set(group.id, group);
+        satellites.forEach(satellite => {
+          satellite.set({group: group.id});
+        });
+        break;
+      }
+      case 'createOneGroupPerClient': {
+        satellites.forEach(async satellite => {
+          const group = await server.stateManager.create('group', {
+            name: satellite.get('name'),
+          });
+          group.onUpdate(updates => {
+            if ('sourceName' in updates) {
+              const sourceNameSplit = updates.sourceName.split('.')[0];
+              const analysisFilename = `data_analysis_${sourceNameSplit}.json`
+              const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
+              const analysisData = fs.readFileSync(pathData, 'utf8');
+              group.set({
+                sourceData: {
+                  name: updates.sourceName,
+                  data: analysisData
+                }
+              });
+            }
+          });
+
+          groups.set(group.id, group);
+          satellite.set({ group: group.id });
+        });
         break;
       }
       case 'deleteGroup': {
