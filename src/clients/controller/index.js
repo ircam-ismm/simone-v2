@@ -24,6 +24,19 @@ import '@ircam/sc-components/sc-slider.js';
 import '@ircam/sc-components/sc-transport.js';
 import '@ircam/sc-components/sc-record.js';
 import '@ircam/sc-components/sc-signal.js';
+import '@ircam/sc-components/sc-tab.js';
+import '@ircam/sc-components/sc-filetree.js';
+import '@ircam/sc-components/sc-waveform.js';
+import '@ircam/sc-components/sc-dragndrop.js';
+
+/*
+TODO : 
+
+- analyse file when dragndrop
+- loop record mode
+
+
+*/
 
 // - General documentation: https://soundworks.dev/
 // - API documentation:     https://soundworks.dev/api
@@ -69,6 +82,67 @@ async function main($container) {
   const global = await client.stateManager.attach('global');
   const controller = await client.stateManager.create('controller');
 
+  let inputMode = 'realtime';
+
+  const workerBlob = new Blob([mfccWorkerString], { type: 'text/javascript' });
+  const workerUrl = URL.createObjectURL(workerBlob);
+  const analysisWorker = new Worker(workerUrl);
+
+  analysisWorker.postMessage({
+    type: 'message',
+    data: "worker says hello",
+  });
+
+  analysisWorker.addEventListener('message', e => {
+    const { type, data } = e.data;
+    if (type === "message") {
+      console.log(data);
+    }
+    if (type === "analyze-calibration") {
+      // analysisEngine.setNorm(data.means, data.std, data.minRms, data.maxRms);
+      means = data.means;
+      std = data.std;
+      minRms = data.minRms;
+      maxRms = data.maxRms;
+      // save in file 
+      const now = new Date();
+      const filename = `calibration-${now.getFullYear()}${now.getMonth()}${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.txt`;
+      filesystemCalibration.writeFile(filename, JSON.stringify(data));
+      recordedBuffer = null;
+      //update render
+      calibrationLoaded = filename;
+      const $selectCalibration = document.getElementById('select-calibration');
+      $selectCalibration.value = filename;
+      renderApp();
+    }
+    if (type === 'analyze-recording') {
+      // recreate buffer
+      const buffer = new AudioBuffer({
+        length: data.bufferParams.length,
+        sampleRate: data.bufferParams.sampleRate
+      });
+      const bufferData = buffer.getChannelData(0);
+      for (let i = 0; i < buffer.length; i++) {
+        bufferData[i] = data.buffer[i]; 
+      }
+      // update engine
+      const {means, std, minRms, maxRms} = data;
+      const norms = {
+        means, 
+        std, 
+        minRms, 
+        maxRms
+      };
+      analyzerEngine.buffer = buffer;
+      analyzerEngine.setNorm(norms);
+      analyzerEngine.setLoopLimits(0, buffer.duration);
+      // analyzerEngine.start();
+      // update waveform 
+      loadedTargetBuffer = buffer;
+      renderApp();
+    }
+  });
+
   // microphone
   let micStream;
   try {
@@ -81,13 +155,7 @@ async function main($container) {
 
   const micNode = new MediaStreamAudioSourceNode(audioContext, {mediaStream: micStream});
 
-  // audio path
-  const analyser = new AnalyserNode(audioContext, {
-    fftSize: analysisParams.frameSize,
-  });
-
-  micNode.connect(analyser);
-
+  const delayNode = new DelayNode(audioContext);
 
   // calibration
   const mediaRecorder = new MediaRecorder(micStream);
@@ -107,43 +175,10 @@ async function main($container) {
     renderApp();
   });
 
-  const workerBlob = new Blob([mfccWorkerString], { type: 'text/javascript' });
-  const workerUrl = URL.createObjectURL(workerBlob);
-  const calibrationWorker = new Worker(workerUrl);
-
-  calibrationWorker.postMessage({
-    type: 'message',
-    data: "worker says hello",
-  });
-
-  calibrationWorker.addEventListener('message', e => {
-    const { type, data } = e.data;
-    if (type === "message") {
-      console.log(data);
-    }
-    if (type === "analyze-target") {
-      // analysisEngine.setNorm(data.means, data.std, data.minRms, data.maxRms);
-      console.log('maxRms', data.maxRms);
-      means = data.means;
-      std = data.std;
-      minRms = data.minRms;
-      maxRms = data.maxRms;
-      // save in file 
-      const now = new Date();
-      const filename = `calibration-${now.getFullYear()}${now.getMonth()}${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.txt`;
-      filesystemCalibration.writeFile(filename, JSON.stringify(data));
-      recordedBuffer = null;
-      //update render
-      calibrationLoaded = filename;
-      const $selectCalibration = document.getElementById('select-calibration');
-      $selectCalibration.value = filename;
-      renderApp();
-    }
-  });
 
   // audio analysis 
-  // const scheduler = new Scheduler(() => audioContext.currentTime);
   const mfcc = new Mfcc(analysisParams);
+    // realtime
   const analysisBuffer = new Float32Array(analysisParams.frameSize);
   for (let i = 0; i < analysisBuffer.length; i++) {
     analysisBuffer[i] = 0;
@@ -198,75 +233,122 @@ async function main($container) {
     }
   });
 
-  micNode.connect(processor);
+  micNode.connect(delayNode);
+  delayNode.connect(processor);
 
-  // class AnalysisEngine {
-  //   constructor() {
-  //     this.active = false;
+    // offline
+  class AnalyzerEngine {
+    constructor(period, frameSize) {
+      this.period = period;
+      this.frameSize = Math.pow(2, Math.round(Math.log2(frameSize))); // clamp to nearest power of 2
 
-  //     this.targetData = new Float32Array(analysisParams.frameSize);
-  //     this.period = analysisParams.hopSize/analysisParams.sampleRate;
+      this.buffer = null;
 
-  //     this.means = [];
-  //     this.std = [];
-  //     for (let i = 0; i < analysisParams.mfccCoefs; i++) {
-  //       this.means.push(0.);
-  //       this.std.push(1.);
-  //     }
-  //     this.minRms = 0;
-  //     this.maxRms = 1;
+      this.active = false;
+      this.periodRand = 0.004;
 
-  //     this.tick = this.tick.bind(this);
-  //   }
+      this.tick = this.tick.bind(this);
+    }
 
-  //   setNorm(meansMfcc, stdMfcc, minRms, maxRms) {
-  //     this.means = meansMfcc;
-  //     this.std = stdMfcc;
-  //     this.minRms = minRms;
-  //     this.maxRms = maxRms;
-  //   }
+    setNorm(norms) {
+      this.means = norms.means;
+      this.std = norms.std;
+      this.minRms = norms.minRms;
+      this.maxRms = norms.maxRms;
+    }
 
-  //   setPeriod(period) {
-  //     this.period = period;
-  //   }
+    setLoopLimits(startTime, endTime) {
+      if (endTime - startTime > 0) {
+        this.startTime = startTime;
+        this.endTime = endTime;
+      }
+    }
 
-  //   tick(currentTime) {
-  //     currentTime = Math.max(currentTime, audioContext.currentTime);
-  //     const $signalMic = document.getElementById('signal-mic');
+    start() {
+      this.transportTime = this.startTime;
+      this.active = true;
+    }
 
-  //     if (this.active) {
-  //       analyser.getFloatTimeDomainData(this.targetData);
-  //       const targetMfcc = mfcc.get(this.targetData);
-  //       for (let j = 0; j < analysisParams.mfccCoefs; j++) {
-  //         targetMfcc[j] = (targetMfcc[j] - this.means[j]) / this.std[j];
-  //       }
-  //       let targetRms = 0;
-  //       for (let j = 0; j < this.targetData.length; j++) {
-  //         targetRms += this.targetData[j] ** 2;
-  //       }
-  //       targetRms = Math.sqrt(targetRms / this.targetData.length);
-  //       console.log(targetRms, this.targetData);
-  //       if (this.maxRms - this.minRms === 0) {
-  //         targetRms = 0;
-  //       } else {
-  //         targetRms = (targetRms - this.minRms) / (this.maxRms - this.minRms);
-  //       }
-  //       targetRms = Math.max(Math.min(targetRms, 1), 0);
+    stop() {
+      this.active = false
+    }
 
-  //       controller.set({ analysisData: [targetMfcc, targetRms] });
-        
-  //       $signalMic.value = {
-  //         time: audioContext.currentTime,
-  //         data: targetRms,
-  //       }
-  //     }
-  //     return currentTime + this.period;
-  //   }
-  // }
+    tick(time) {
+      time = Math.max(time, audioContext.currentTime);
+      if (this.active && this.buffer) {
+        const bufferData = this.buffer.getChannelData(0);
+        const idx = Math.floor(this.transportTime * this.buffer.sampleRate);
+        const iMin = Math.max(0, idx - this.frameSize / 2);
+        const iMax = idx + this.frameSize / 2;
+        const grain = bufferData.slice(iMin, iMax);
+        // compute mfcc
+        const grainMfcc = mfcc.get(grain);
+        for (let j = 0; j < 12; j++) {
+          grainMfcc[j] = (grainMfcc[j] - this.means[j]) / this.std[j];
+        }
+        //compute rms
+        let grainRms = 0;
+        for (let j = 0; j < grain.length; j++) {
+          grainRms += grain[j] ** 2;
+        }
+        grainRms = Math.sqrt(grainRms / grain.length);
+        if (this.maxRms === 0) {
+          grainRms = 0;
+        } else {
+          grainRms = (grainRms - this.minRms) / (this.maxRms - this.minRms);
+        }
+        grainRms = Math.max(Math.min(grainRms, 1), 0);
 
-  // const analysisEngine = new AnalysisEngine();
+        controller.set({ analysisData: [grainMfcc, grainRms] });
 
-  // scheduler.add(analysisEngine.tick, audioContext.currentTime);
+        const $waveform = document.querySelector('#target-waveform');
+        $waveform.cursorPosition = this.transportTime;
+      }
+
+      let period = this.period;
+      const transportTime = this.transportTime;
+      const loopDuration = this.endTime - this.startTime;
+
+      this.transportTime += this.period;
+
+      if (this.transportTime < this.startTime) {
+        while (this.transportTime < this.startTime) {
+          this.transportTime += loopDuration;
+        }
+      }
+      if (this.transportTime > this.endTime) {
+        this.transportTime = this.startTime;
+        period = this.endTime - transportTime;
+        // while (this.transportTime > this.endTime) {
+        //   this.transportTime -= loopDuration;
+        // }
+      }
+
+      return time + period;
+    }
+  }
+
+  const scheduler = new Scheduler(() => audioContext.currentTime);
+  const analyzerEngine = new AnalyzerEngine(analysisParams.hopSize/audioContext.sampleRate, analysisParams.frameSize);
+  scheduler.add(analyzerEngine.tick, audioContext.currentTime);
+
+  let loadedTargetBuffer = null;
+
+  function loadTargetBufferFromDragndrop(e) {
+    const buffer = Object.values(e.detail.value)[0];
+    // analyze
+    analysisWorker.postMessage({
+      type: 'analyze-recording',
+      data: {
+        analysisInitData: analysisParams,
+        buffer: buffer.getChannelData(0),
+        bufferParams: {
+          length: buffer.length,
+          sampleRate: buffer.sampleRate
+        }
+      }
+    });
+  }
 
   // groups 
   const groups = await client.stateManager.getCollection('group');
@@ -295,7 +377,7 @@ async function main($container) {
 
   // updates/subscribe
   controller.onUpdate(updates => {
-    Object.entries(updates).forEach(([key, value]) => {
+    Object.entries(updates).forEach(async ([key, value]) => {
       switch (key) {
         case 'calibrationFileRead': {
           calibrationLoaded = value.filename;
@@ -306,6 +388,19 @@ async function main($container) {
           maxRms = data.maxRms;
           break;
         }
+        case 'analysisFileRead': {
+          // get url
+          const file = filesystemSoundbank.getTree().children.find(e => e.name === value.filename);
+          // get buffer
+          const buffer = await audioBufferLoader.load(file.url);
+          analyzerEngine.buffer = buffer;
+          analyzerEngine.setNorm(value.data);
+          analyzerEngine.setLoopLimits(0, buffer.duration);
+          // analyzerEngine.start();
+          // update waveform 
+          loadedTargetBuffer = buffer;
+          renderApp();
+        }
       }
     });
     renderApp();
@@ -314,30 +409,17 @@ async function main($container) {
   // presets
 
   // render
-  function renderApp() {
-    const synthesisParams = ['volume', 'detune', 'grainPeriod', 'grainDuration', 'randomizer'];
+  function renderInputPanel() {
     const $selectCalibration = document.getElementById('select-calibration');
     let loadCalibrationBtnDisabled = true;
     if ($selectCalibration) {
       loadCalibrationBtnDisabled = !$selectCalibration.value || $selectCalibration.value === calibrationLoaded;
     }
-    
-    render(html`
-      <div class="controller-layout">
-        <header>
-          <h1>${client.config.app.name} | ${client.role}</h1>
-          <sw-audit .client="${client}"></sw-audit>
-        </header>
-        <!-- microphone and calibration -->
-        <div style="
-          border-bottom: solid 2px var(--sw-lighter-background-color);
-          width: 100%;
-          height: 100px;
-          display: flex;
-          flex-direction: row;
-        ">
+
+    switch (inputMode) {
+      case 'realtime': {
+        return html`
           <div style="
-            margin-left: 10px;
             margin-right: 10px;
             display: flex;
             flex-direction: column;
@@ -357,7 +439,7 @@ async function main($container) {
               height: 96px;
               width: 300px;
               margin-top: 2px;
-              margin-right: 50px;
+              margin-right: 20px;
               background-color: var(--sw-medium-background-color);
               color: #ffffff;
             "
@@ -368,6 +450,19 @@ async function main($container) {
             .lineWidth=${3}
             id="signal-mic"
           ></sc-signal>
+          <div style="
+            margin-right: 50px;
+          ">
+            <h2>delay mic</h2>
+            <sc-slider
+              min=0
+              max=1
+              number-box
+              value=0
+              @input=${e => delayNode.delayTime.setTargetAtTime(e.detail.value, now, 0.02)}
+            >
+            </sc-slider>
+          </div>
           <div>
             <h2>calibration</h2>
             <sc-record
@@ -381,8 +476,8 @@ async function main($container) {
               "
               ?disabled=${recordedBuffer === null}
               @release=${e => {
-                calibrationWorker.postMessage({
-                  type: 'analyze-target',
+                analysisWorker.postMessage({
+                  type: 'analyze-calibration',
                   data: {
                     analysisInitData: analysisParams,
                     buffer: recordedBuffer.getChannelData(0),
@@ -410,7 +505,95 @@ async function main($container) {
             >load</sc-button>
             <p>loaded: ${calibrationLoaded}</p> 
           </div>
-          
+        `
+        break;
+      }
+      case 'loop record': {
+        return html `
+        `
+        break;
+      }
+      case 'loop load': {
+        return html`
+          <sc-filetree
+            style="
+              height: 100%;
+              margin-right: 10px;
+              flex-shrink: 0;
+            "
+            value=${JSON.stringify(filesystemSoundbank.getTree())} 
+            @input=${e => controller.set({ loadAnalysisFile: e.detail.value.name }) }
+          >
+          </sc-filetree>
+          <sc-dragndrop
+            style="
+              height: 100%;
+              width: 200px;
+              margin-right: 10px;
+              flex-shrink: 0;
+            "
+            @change=${loadTargetBufferFromDragndrop}
+          ></sc-dragndrop>
+          <sc-transport
+            style="
+              height: 100%;
+              flex-shrink: 0;
+              margin-right: 10px;
+            "
+            .buttons=${["play", "stop"]}
+            @change=${e => e.detail.value === 'play' ? analyzerEngine.start() : analyzerEngine.stop()}
+          ></sc-transport>
+          <sc-waveform
+            id="target-waveform"
+            style="
+              height: 100%;
+              width: 100%;
+              margin-right: 10px;
+            "
+            selection
+            cursor
+            .buffer=${loadedTargetBuffer}
+            @input=${e => analyzerEngine.setLoopLimits(e.detail.value.selectionStart, e.detail.value.selectionEnd)}
+          >
+          </sc-waveform>
+        `
+        break;
+      }
+    }
+  }
+
+  function renderApp() {
+    const now = audioContext.currentTime;
+    const synthesisParams = ['volume', 'detune', 'grainPeriod', 'grainDuration', 'randomizer'];
+    
+    render(html`
+      <div class="controller-layout">
+        <header>
+          <h1>${client.config.app.name} | ${client.role}</h1>
+          <sw-audit .client="${client}"></sw-audit>
+        </header>
+        <!-- microphone and calibration -->
+        <div style="
+          border-bottom: solid 2px var(--sw-lighter-background-color);
+          width: 100%;
+          height: 100px;
+          display: flex;
+          flex-direction: row;
+        ">
+          <sc-tab
+            style="
+              margin-right: 10px;
+              flex-shrink: 0;
+            "
+            orientation=vertical
+            value=${inputMode}
+            options="${JSON.stringify(['realtime', 'loop record', 'loop load'])}"
+            @change=${e => {
+            inputMode = e.detail.value;
+            renderApp();
+          }}
+          ></sc-tab>
+          ${renderInputPanel()}
         </div>
         <!-- groups and controls -->
         <div style="

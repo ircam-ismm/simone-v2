@@ -19,5 +19,5 @@ export default {
   deleteGroup: {
     type: 'integer',
     event: true,
-  }
+  },
 }

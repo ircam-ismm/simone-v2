@@ -6,7 +6,7 @@ addEventListener('message', e => {
       data,
     });
   }
-  if (type === 'analyze-source' || type === 'analyze-target') {
+  if (type === 'analyze-calibration') {
     console.log('begin analysis');
     const init = data.analysisInitData;
     const analyzer = new Mfcc(init.mfccBands, init.mfccCoefs, init.mfccMinFreq, init.mfccMaxFreq, init.frameSize, init.sampleRate);
@@ -20,6 +20,24 @@ addEventListener('message', e => {
         maxRms,
       }
     });
+  }
+  if (type === 'analyze-recording') {
+    console.log('begin analysis');
+    const init = data.analysisInitData;
+    const analyzer = new Mfcc(init.mfccBands, init.mfccCoefs, init.mfccMinFreq, init.mfccMaxFreq, init.frameSize, init.sampleRate);
+    const [mfccFrames, times, means, std, minRms, maxRms] = analyzer.computeBufferMfcc(data.buffer, init.hopSize);
+    postMessage({
+      type,
+      data: {
+        means,
+        std,
+        minRms,
+        maxRms,
+        bufferParams: data.bufferParams,
+        buffer: data.buffer,
+      },
+    });
+    
   }
 });
 

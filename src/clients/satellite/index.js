@@ -68,6 +68,7 @@ async function bootstrap() {
 
   const satellite = await client.stateManager.create('satellite', {name: os.hostname()});
   const controllers = await client.stateManager.getCollection('controller');
+  const global = await client.stateManager.attach('global');
   let group = null;
 
   const buffers = {};
@@ -170,8 +171,6 @@ async function bootstrap() {
     });
   });
 
-
-
   //synthesis
   const scheduler = new Scheduler(() => audioContext.currentTime);
 
@@ -225,6 +224,7 @@ async function bootstrap() {
     set randomizer(value) {
       this._randomizer = Math.floor(value);
     }
+
 
     setTarget(x) {
       this.currGrainMfcc = x[0];

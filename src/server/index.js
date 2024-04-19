@@ -1,6 +1,6 @@
 import '@soundworks/helpers/polyfills.js';
 import { Server } from '@soundworks/core/server.js';
-
+import { configureMaxClient } from '@soundworks/max';
 import { loadConfig } from '../utils/load-config.js';
 import '../utils/catch-unhandled-errors.js';
 
@@ -25,6 +25,7 @@ import { AudioBufferLoader } from '@ircam/sc-loader';
 // - Wizard & Tools:        `npx soundworks`
 
 const config = loadConfig(process.env.ENV, import.meta.url);
+configureMaxClient(config);
 
 console.log(`
 --------------------------------------------------------
@@ -59,6 +60,7 @@ server.pluginManager.register('filesystem-calibration', pluginFilesystem, {
 });
 server.pluginManager.register('filesystem-analysis', pluginFilesystem, {
   dirname: pathAnalysis,
+  publicPath: 'analysis-data'
 });
 
 server.stateManager.registerSchema('global', globalSchema);
@@ -77,7 +79,6 @@ const filesystemSoundbank = await server.pluginManager.get('filesystem-soundbank
 const filesystemAnalysis = await server.pluginManager.get('filesystem-analysis');
 
 // soundfiles analysis 
-
 const worker = new Worker('./src/server/utils/mfcc.worker.js');
 worker.on('message', e => {
   if (e.type === 'analyse-soundfile') {
@@ -231,6 +232,25 @@ controllers.onUpdate((state, updates) => {
         state.set({calibrationFileRead: {
           filename: value,
           data
+        }});
+        break;
+      }
+      case 'loadAnalysisFile': {
+        const filenameSplit = value.split('.')[0];
+        const analysisFilename = `data_analysis_${filenameSplit}.json`
+        const path = `${pathAnalysis}/${analysisFilename}`
+        const data = fs.readFileSync(path, 'utf8');
+        const {means, std, minRms, maxRms} = JSON.parse(data);
+        const norm = {
+          means,
+          std,
+          minRms,
+          maxRms,
+        };
+
+        state.set({analysisFileRead: {
+          filename: value,
+          data: norm,
         }});
         break;
       }
