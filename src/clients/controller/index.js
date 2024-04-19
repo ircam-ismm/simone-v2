@@ -334,8 +334,7 @@ async function main($container) {
 
   let loadedTargetBuffer = null;
 
-  function loadTargetBufferFromDragndrop(e) {
-    const buffer = Object.values(e.detail.value)[0];
+  function loadTargetBuffer(buffer) {
     // analyze
     analysisWorker.postMessage({
       type: 'analyze-recording',
@@ -510,6 +509,64 @@ async function main($container) {
       }
       case 'loop record': {
         return html `
+          <div style="
+            height: 100%;
+            display: flex;
+            align-items: center
+          ">
+            <sc-record
+              style="
+                height: 50px;
+                width: 50px;
+                margin-right: 10px;
+                flex-shrink: 0
+              "
+              @change=${e => {
+                e.detail.value ? mediaRecorder.start() : mediaRecorder.stop();
+              }}
+            ></sc-record>
+          </div>
+          <sc-waveform
+            style="
+              height: 100%;
+              flex-shrink: 0
+            "
+            .buffer=${recordedBuffer}
+          ></sc-waveform>
+          <sc-button
+            style="
+              height: 100%;
+              width: 50px;
+              margin-right: 10px;
+              flex-shrink: 0;
+            "
+            selected
+            @release=${e => loadTargetBuffer(recordedBuffer)}
+          >
+          use ➡
+          </sc-button>
+          <sc-transport
+            style="
+              height: 100%;
+              flex-shrink: 0;
+              margin-right: 10px;
+            "
+            .buttons=${["play", "stop"]}
+            @change=${e => e.detail.value === 'play' ? analyzerEngine.start() : analyzerEngine.stop()}
+          ></sc-transport>
+          <sc-waveform
+            id="target-waveform"
+            style="
+              height: 100%;
+              width: 100%;
+              margin-right: 10px;
+            "
+            selection
+            cursor
+            .buffer=${loadedTargetBuffer}
+            @input=${e => analyzerEngine.setLoopLimits(e.detail.value.selectionStart, e.detail.value.selectionEnd)}
+          >
+          </sc-waveform>
         `
         break;
       }
@@ -532,7 +589,7 @@ async function main($container) {
               margin-right: 10px;
               flex-shrink: 0;
             "
-            @change=${loadTargetBufferFromDragndrop}
+            @change=${e => loadTargetBuffer(Object.values(e.detail.value)[0])}
           ></sc-dragndrop>
           <sc-transport
             style="
@@ -589,6 +646,7 @@ async function main($container) {
             value=${inputMode}
             options="${JSON.stringify(['realtime', 'loop record', 'loop load'])}"
             @change=${e => {
+            loadedTargetBuffer = null;
             inputMode = e.detail.value;
             renderApp();
           }}
