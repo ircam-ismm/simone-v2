@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process';
 import { Worker } from 'worker_threads';
 
 import { loadConfig } from '../../utils/load-config.js';
+import { config as ledConfig } from './led.js';
 
 import pluginFilesystem from '@soundworks/plugin-filesystem/client.js';
 
@@ -16,6 +17,7 @@ import {
   AudioBufferSourceNode,
   DynamicsCompressorNode,
   GainNode,
+  AnalyserNode,
 } from 'node-web-audio-api'; 
 
 import { dbtoa } from '@ircam/sc-utils';
@@ -34,10 +36,16 @@ const audioContext = new AudioContext();
 
 const audioBufferLoader = new AudioBufferLoader({});
 
+const LED_BUFFER_SIZE = 4096;
+
 async function bootstrap() {
   /**
    * Load configuration from config files and create the soundworks client
    */
+  const ledClient = (process.env.LOGNAME === 'golvet'
+    ? null
+    : new Client({ role: 'dotpi-led-client', ...ledConfig }));
+
   const config = loadConfig(process.env.ENV, import.meta.url);
   const client = new Client(config);
 
@@ -63,6 +71,9 @@ async function bootstrap() {
    * Launch application
    */
   await client.start();
+  if (ledClient) {
+    await ledClient.start();
+  }
 
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
 
@@ -174,7 +185,6 @@ async function bootstrap() {
   //synthesis
   const scheduler = new Scheduler(() => audioContext.currentTime);
 
-
   class SynthesisEngine {
     constructor() {
       this.jitter = 0.004;
@@ -274,8 +284,9 @@ async function bootstrap() {
             time: time,
           }
         });
+        this.currGrainMfcc = null;
+        this.currGrainRms = null;
       }
-
       return time + this.grainPeriod;
     } 
   }
@@ -283,6 +294,7 @@ async function bootstrap() {
   const synthesisEngine = new SynthesisEngine();
 
   scheduler.add(synthesisEngine.tick, audioContext.currentTime);
+  
 
   // audio path
   const outputNode = new GainNode(audioContext);
@@ -299,6 +311,60 @@ async function bootstrap() {
   busNode.connect(compressor);
   compressor.connect(outputNode);
   outputNode.connect(audioContext.destination);
+  
+
+
+  // led
+  function hexToRgb(hex, factor) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: Math.min(parseInt(result[1], 16) * factor, 255),
+      g: Math.min(parseInt(result[2], 16) * factor, 255),
+      b: Math.min(parseInt(result[3], 16) * factor, 255)
+    } : null;
+  }
+
+  if (ledClient) {
+    const rgb = await ledClient.stateManager.create('rgb');
+    rgb.set({r: 0, g: 0, b: 0});
+  
+    const analyser = new AnalyserNode(audioContext, {
+      fftSize: LED_BUFFER_SIZE,
+    });
+    const analyserArray = new Float32Array(analyser.fftSize);
+    const analyserEngine = {
+      tick: time => {
+        analyser.getFloatTimeDomainData(analyserArray);
+  
+        let rms = 0
+        for (let i = 0; i < analyser.fftSize; i++) {
+          rms += analyserArray[i] ** 2;
+        }
+        rms /= analyser.fftSize;
+        rms = Math.sqrt(rms);
+  
+        const inflexionPoint = 0.05;
+        const inflexionVal = 240;
+        let colorIntensity;
+  
+        if (rms < inflexionPoint) {
+          colorIntensity = rms * inflexionVal / inflexionPoint
+        } else {
+          colorIntensity = (255 - inflexionVal) / (1 - inflexionPoint) * rms + (inflexionVal - inflexionPoint * 255) / (1 - inflexionPoint);
+        }
+        colorIntensity = Math.min(colorIntensity, 255)/255;
+        
+        const baseColor = global.get('ledColor');
+        const intensityFactor = global.get('ledIntensity');
+        const color = hexToRgb(baseColor, intensityFactor*colorIntensity);
+        rgb.set(color);
+  
+        return time + analyser.fftSize / audioContext.sampleRate;
+      }
+    }
+    outputNode.connect(analyserEngine);
+    scheduler.add(analyserEngine.tick, audioContext.currentTime);
+  }
 
   console.log(`Hello ${client.config.app.name}!`);
 }

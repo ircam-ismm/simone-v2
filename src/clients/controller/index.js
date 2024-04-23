@@ -1,5 +1,6 @@
 import '@soundworks/helpers/polyfills.js';
-import { Client } from '@soundworks/core/client.js';
+import { Client, Context } from '@soundworks/core/client.js';
+
 import launcher from '@soundworks/helpers/launcher.js';
 
 import { html, render } from 'lit';
@@ -28,6 +29,8 @@ import '@ircam/sc-components/sc-tab.js';
 import '@ircam/sc-components/sc-filetree.js';
 import '@ircam/sc-components/sc-waveform.js';
 import '@ircam/sc-components/sc-dragndrop.js';
+import '@ircam/sc-components/sc-midi.js';
+import '@ircam/sc-components/sc-color-picker.js';
 
 /*
 TODO : 
@@ -406,6 +409,45 @@ async function main($container) {
   });
 
   // presets
+  const nPresets = 16;
+  const presets = global.get('presets');
+  let presetMode = 'load';
+
+  function presetButtonCallback(i) {
+    switch (presetMode) {
+      case 'save': {
+        const preset = {}
+        groups.getValues().forEach(group => {
+          const values = {
+            sourceName: group.sourceName,
+            volume: group.volume,
+            detune: group.detune,
+            grainPeriod: group.grainPeriod,
+            grainDuration: group.grainDuration,
+            randomizer: group.randomizer,
+          };
+          preset[group.name] = values;
+        });
+        presets[i] = preset;
+        break;
+      }
+      case 'del':
+        delete presets[i];
+        break;
+      case 'load': {
+        const preset = presets[i];
+        Object.entries(preset).forEach(([groupName, groupValue]) => {
+          const groupState = groups.find(group => group.get('name') === groupName);
+          if (groupState) {
+            groupState.set(groupValue);
+          }
+        });
+        break;
+      }
+    }
+    global.set({presets});
+    renderApp();
+  }
 
   // render
   function renderInputPanel() {
@@ -646,6 +688,9 @@ async function main($container) {
             value=${inputMode}
             options="${JSON.stringify(['realtime', 'loop record', 'loop load'])}"
             @change=${e => {
+            active = false;
+            analyzerEngine.stop();
+            recordedBuffer = null;
             loadedTargetBuffer = null;
             inputMode = e.detail.value;
             renderApp();
@@ -681,22 +726,16 @@ async function main($container) {
                       width: 100%;
                     "
                     editable
+                    value=${group.get('name')}
                     @change=${e => group.set({ name: e.detail.value })}
-                  >${group.get('name')}</sc-text>
-                  <input 
-                    type="color"
+                  ></sc-text>
+                  <sc-color-picker
                     style="
-                      margin-left: 0px;
-                      height: 30px;
-                      width: 30px;
-                      cursor: pointer;
-                      border: solid 1px var(--sw-lighter-background-color);
-                      background-color: var(--sw-light-background-color);
                       flex-shrink: 0;
                     "
                     value=${group.get('color')}
-                    @input=${e => group.set({color: e.target.value})}
-                  />
+                    @input=${e => group.set({ color: e.target.value })}
+                  ></sc-color-picker>
                   <sc-icon
                     style="
                       flex-shrink: 0;
@@ -775,6 +814,7 @@ async function main($container) {
                         const groupName = e.detail.value;
                         const group = groups.find(group => group.get('name') === groupName);
                         let groupId = group ? group.id : null;  
+                        console.log(groupId)
                         satellite.set({group: groupId});
                       }}
                     ></sc-select>
@@ -791,19 +831,49 @@ async function main($container) {
                 `
               })}
             </div>
+            <h2>led controls</h2>
+            <div
+              style="
+                display: flex;
+              "
+            >
+              <sc-color-picker
+                style="
+                  margin-right: 10px;
+                  flex-shrink: 0;
+                "
+                value=${global.get('ledColor')}
+                @input=${e => global.set({ledColor: e.detail.value})}
+              ></sc-color-picker>
+              <sc-slider
+                style="
+                  width: 100%;
+                "
+                max=10
+                number-box
+                value=${global.get('ledIntensity')}
+                @input=${e => global.set({ ledIntensity: e.detail.value })}
+              ></sc-slider>
+            </div>
           </div>
 
           <sc-separator direction="row"></sc-separator>
 
           <!-- controls -->
-          <div style="
-            flex-grow: 2;
-            overflow: hidden;
-            padding: 20px;
-            display: flex;
-            align-content: flex-start;
-            flex-wrap: wrap;
-          ">
+          <div>
+            <sc-midi
+              style="
+                margin: 10px 20px;
+              "
+            ></sc-midi>
+            <div style="
+              flex-grow: 2;
+              overflow: hidden;
+              padding: 0 20px;
+              display: flex;
+              align-content: flex-start;
+              flex-wrap: wrap;
+            "> 
               ${groups.map(group => {
                 return html`
                   <div style="  
@@ -865,6 +935,7 @@ async function main($container) {
                         ">
                           <p>${param}</p>
                           <sc-slider
+                            id="group-${group.get('name')}-${param}"
                             number-box
                             min=${schema[param].min}
                             max=${schema[param].max}
@@ -881,6 +952,41 @@ async function main($container) {
                   </div>
                 `
               })}
+            </div>
+          </div>
+          <div
+            style="
+              width: 100px;
+              border-left: solid 2px var(--sw-lighter-background-color);
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            "
+          >
+            <h2>presets</h2>
+            <sc-tab
+              style="
+                width: 95%;
+                height: 100px;
+                margin-bottom: 20px;
+              "
+              orientation="vertical"
+              value=${presetMode}
+              options="${JSON.stringify(['load', 'save', 'del'])}"
+              @change=${e => presetMode = e.detail.value}
+            ></sc-tab>
+            ${Array(nPresets).fill().map((_, i) => {
+              return html`
+                <sc-button
+                  id="button-preset-${i+1}"
+                  style="
+                    width: 95%;
+                  "
+                  .selected=${i+1 in presets}
+                  @input=${e => presetButtonCallback(i+1)}
+                >${i+1}</sc-button>
+              `
+            })}
           </div>
         </div>
       </div>

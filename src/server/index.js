@@ -1,6 +1,6 @@
 import '@soundworks/helpers/polyfills.js';
 import { Server } from '@soundworks/core/server.js';
-import { configureMaxClient } from '@soundworks/max';
+// import { configureMaxClient } from '@soundworks/max';
 import { loadConfig } from '../utils/load-config.js';
 import '../utils/catch-unhandled-errors.js';
 
@@ -16,6 +16,8 @@ import groupSchema from './schemas/group.js';
 import satelliteSchema from './schemas/satellite.js';
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
+import satellite from './schemas/satellite.js';
+import { group } from 'console';
 
 
 
@@ -25,7 +27,7 @@ import { AudioBufferLoader } from '@ircam/sc-loader';
 // - Wizard & Tools:        `npx soundworks`
 
 const config = loadConfig(process.env.ENV, import.meta.url);
-configureMaxClient(config);
+// configureMaxClient(config);
 
 console.log(`
 --------------------------------------------------------
@@ -48,7 +50,8 @@ server.useDefaultApplicationTemplate();
 // server.stateManager.registerSchema('my-schema', definition);
 const pathSoundbank = 'public/soundbank';
 const pathCalibration = 'public/calibration';
-const pathAnalysis = 'public/analysis-data'
+const pathAnalysis = 'public/analysis-data';
+const pathPresets = 'public/presets';
 
 server.pluginManager.register('platform-init', pluginPlatformInit);
 server.pluginManager.register('filesystem-soundbank', pluginFilesystem, {
@@ -61,6 +64,10 @@ server.pluginManager.register('filesystem-calibration', pluginFilesystem, {
 server.pluginManager.register('filesystem-analysis', pluginFilesystem, {
   dirname: pathAnalysis,
   publicPath: 'analysis-data'
+});
+server.pluginManager.register('filesystem-presets', pluginFilesystem, {
+  dirname: pathPresets,
+  publicPath: 'presets'
 });
 
 server.stateManager.registerSchema('global', globalSchema);
@@ -77,6 +84,7 @@ const audioBufferLoader = new AudioBufferLoader({});
 
 const filesystemSoundbank = await server.pluginManager.get('filesystem-soundbank');
 const filesystemAnalysis = await server.pluginManager.get('filesystem-analysis');
+const filesystemPresets = await server.pluginManager.get('filesystem-presets');
 
 // soundfiles analysis 
 const worker = new Worker('./src/server/utils/mfcc.worker.js');
@@ -133,19 +141,75 @@ filesystemSoundbank.onUpdate(async updates => {
 // this.worker = new Worker(`data:application/javascript,${script}`);
 // const mfccWorker = new Worker('./src/server/utils/mfcc.worker.js');
 
-
-
 const global = await server.stateManager.create('global');
 const groups = new Map();
-
 const satellites = await server.stateManager.getCollection('satellite');
+const controllers = await server.stateManager.getCollection('controller');
+
+function saveGroups() {
+  const groupsList = [];
+  groups.forEach(group => {
+    groupsList.push({
+      name: group.get('name'),
+      color: group.get('color'),
+    });
+  });
+  filesystemPresets.writeFile('groups.json', JSON.stringify(groupsList));
+}
+
+function saveSatellitesGroupsMap() {
+  const map = {}
+  satellites.forEach(satellite => {
+    const group = groups.get(satellite.get('group'));
+    if (group) {
+      map[satellite.get('name')] = group.get('name');
+    }
+  }); 
+  filesystemPresets.writeFile('groups-satellites-map.json', JSON.stringify(map));
+}
+
+// load existing group config and presets
+const groupsList = JSON.parse(fs.readFileSync(filesystemPresets.getTree().children.find(e => e.name === "groups.json").path));
+const presets = JSON.parse(fs.readFileSync(filesystemPresets.getTree().children.find(e => e.name === "presets.json").path));
+
+global.set({presets});
+
+groupsList.forEach(async value => {
+  const group = await server.stateManager.create('group', value);
+  group.onUpdate(updates => {
+    if ('sourceName' in updates && updates.sourceName !== null) {
+      const sourceNameSplit = updates.sourceName.split('.')[0];
+      const analysisFilename = `data_analysis_${sourceNameSplit}.json`
+      const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
+      const analysisData = fs.readFileSync(pathData, 'utf8');
+      group.set({
+        sourceData: {
+          name: updates.sourceName,
+          data: analysisData
+        }
+      });
+    }
+    if ('color' in updates) {
+      saveGroups();
+    }
+    if ('name' in updates) {
+      saveGroups();
+    }
+  });
+
+  groups.set(group.id, group);
+});
 
 global.onUpdate(update => {
   Object.entries(update).forEach(async ([key, value]) => {
     switch (key) {
+      case 'presets': {
+        filesystemPresets.writeFile('presets.json', JSON.stringify(value));
+        break;
+      }
       case 'createGroup': {
         const group = await server.stateManager.create('group');
-        group.set({name: `group-${group.id}`});
+        await group.set({name: `group-${group.id}`});
         group.onUpdate(updates => {
           if ('sourceName' in updates) {
             const sourceNameSplit = updates.sourceName.split('.')[0];
@@ -160,11 +224,12 @@ global.onUpdate(update => {
         });
 
         groups.set(group.id, group);
+        saveGroups();
         break;
       }
       case 'createSingleGroup': {
         const group = await server.stateManager.create('group');
-        group.set({ name: `group-${group.id}` });
+        await group.set({ name: `group-${group.id}` });
         group.onUpdate(updates => {
           if ('sourceName' in updates) {
             const sourceNameSplit = updates.sourceName.split('.')[0];
@@ -184,6 +249,7 @@ global.onUpdate(update => {
         satellites.forEach(satellite => {
           satellite.set({group: group.id});
         });
+        saveGroups();
         break;
       }
       case 'createOneGroupPerClient': {
@@ -208,19 +274,44 @@ global.onUpdate(update => {
 
           groups.set(group.id, group);
           satellite.set({ group: group.id });
+          saveGroups();
         });
         break;
       }
       case 'deleteGroup': {
         const group = groups.get(value);
+        groups.delete(group.id);
         await group.delete();
+        saveGroups();
         break;
       }
     }
   });
 });
 
-const controllers = await server.stateManager.getCollection('controller');
+satellites.onUpdate((state, updates) => {
+  Object.entries(updates).forEach(([key, value]) => {
+    switch (key) {
+      case 'group':
+        saveSatellitesGroupsMap();
+        break;
+    }
+  });
+});
+
+satellites.onAttach(satellite => {
+  const groupsSatellitesMap = JSON.parse(fs.readFileSync(filesystemPresets.getTree().children.find(e => e.name === "groups-satellites-map.json").path));
+  const satelliteName = satellite.get('name');
+  if (satelliteName in groupsSatellitesMap) {
+    const groupName = groupsSatellitesMap[satelliteName];
+    const groupState = Array.from(groups.values()).find(group => {
+      return group.get('name') === groupName;
+    });
+    if (groupState) {
+      satellite.set({group: groupState.id});
+    }
+  }
+});
 
 controllers.onUpdate((state, updates) => {
   Object.entries(updates).forEach(([key, value]) => {

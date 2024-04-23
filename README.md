@@ -97,5 +97,19 @@ The elements are the following :
 - A slider to control the duration of each grain
 - A slider to randomize the result of the search for the most similar grain. A value of _n_ means that the _source_ grain played will be randomly selected among the _n_ most similar grains to the _target_ grain. 
 
+## TODO 
+
+- recorder client
+- cleanup code
+- presets
+- install rpi-daemon
+- test leds
+
+db/
+    groups.json
+    groups-clients-map.json
+    presets/
+
+
 ## License
 BSD-3-Clause

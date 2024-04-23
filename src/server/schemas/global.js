@@ -4,6 +4,14 @@ export default {
     default: true,
     nullable: true,
   },
+  ledColor: {
+    type: 'string',
+    default: '#ffffff',
+  },
+  ledIntensity: {
+    type: 'float',
+    default: 0,
+  },
   createGroup: {
     type: 'boolean',
     event: true,

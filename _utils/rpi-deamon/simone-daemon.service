@@ -1,0 +1,18 @@
+[Unit]
+Description=Launch simone application
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=idle
+ExecStartPre=/bin/sh -c 'while ! ping -c1 10.10.0.1; do sleep 1; done'
+ExecStart=node /home/pi/apps/simone-v2/.build/clients/thing/index.js
+WorkingDirectory=/home/pi/apps/simone-v2
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+Group=audio
+
+[Install]
+WantedBy=multi-user.target

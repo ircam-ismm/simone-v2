@@ -9,5 +9,8 @@
     satellite: {
       target: 'node',
     },
+    recorder: {
+      target: 'browser',
+    },
   },
 }
