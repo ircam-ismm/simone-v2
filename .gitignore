@@ -17,6 +17,5 @@ Thumbs.db
 
 #
 public/soundbank/*
-public/presets/
 public/calibration/*
 public/analysis-data/*
