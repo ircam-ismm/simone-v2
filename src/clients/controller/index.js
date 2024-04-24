@@ -468,6 +468,7 @@ async function main($container) {
           ">
             <h2>activate mic</h2>
             <sc-record
+              id="realtime-record"
               style="
                 height: 50px;
                 width: 50px;
@@ -557,6 +558,7 @@ async function main($container) {
             align-items: center
           ">
             <sc-record
+              id="loop-record-record"
               style="
                 height: 50px;
                 width: 50px;
@@ -588,6 +590,7 @@ async function main($container) {
           use ➡
           </sc-button>
           <sc-transport
+            id="loop-record-transport"
             style="
               height: 100%;
               flex-shrink: 0;
@@ -634,6 +637,7 @@ async function main($container) {
             @change=${e => loadTargetBuffer(Object.values(e.detail.value)[0])}
           ></sc-dragndrop>
           <sc-transport
+            id="loop-load-transport"
             style="
               height: 100%;
               flex-shrink: 0;
@@ -802,6 +806,7 @@ async function main($container) {
                       width: 50px;
                       flex-shrink: 0;
                     "
+                    @release=${e => satellite({reboot: true})}
                     >reboot</sc-button>
                     <sc-select 
                       style="
@@ -846,6 +851,7 @@ async function main($container) {
                 @input=${e => global.set({ledColor: e.detail.value})}
               ></sc-color-picker>
               <sc-slider
+                id="led-slider"
                 style="
                   width: 100%;
                 "
@@ -900,6 +906,7 @@ async function main($container) {
                         <p>n clients: ${satellites.filter(e => e.get('group') === group.id).length}</p>
                       </div>
                       <sc-transport
+                        id="group-${group.get('name')}-transport"
                         style="
                           height: 40px;
                         "

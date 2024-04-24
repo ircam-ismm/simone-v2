@@ -17,8 +17,6 @@ Thumbs.db
 
 #
 public/soundbank/*
-!/soundbank/.gitkeep
 public/presets/*
-!/presets/.gitkeep
 public/calibration/*
 public/analysis-data/*

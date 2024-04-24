@@ -42,7 +42,7 @@ async function bootstrap() {
   /**
    * Load configuration from config files and create the soundworks client
    */
-  const ledClient = (process.env.LOGNAME === 'golvet'
+  const ledClient = (typeof (process.env.EMULATE) !== 'undefined'
     ? null
     : new Client({ role: 'dotpi-led-client', ...ledConfig }));
 
@@ -77,99 +77,12 @@ async function bootstrap() {
 
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
 
-  const satellite = await client.stateManager.create('satellite', {name: os.hostname()});
+  
   const controllers = await client.stateManager.getCollection('controller');
   const global = await client.stateManager.attach('global');
   let group = null;
 
-  const buffers = {};
-  for (const fileNode of filesystemSoundbank.getTree().children) {
-    const { useHttps, serverAddress, port } = config.env;
-    const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${fileNode.url}`;
-    // const path = `${config.env.serverAddress}/${fileNode.url}`;
-    const buffer = await audioBufferLoader.load(url);
-    buffers[fileNode.name] = buffer;
-  } 
-
-  filesystemSoundbank.onUpdate(async updates => {
-    for (const event of updates.events) {
-      if (event.type === 'create') {
-        const buffer = await audioBufferLoader.load(event.node.path);
-        buffers[event.node.name] = buffer;
-      }
-      if (event.type === 'delete') {
-        delete buffers[event.node.name];
-      }
-    }
-  });
-
-  satellite.onUpdate(updates => {
-    Object.entries(updates).forEach(async ([key, value]) => {
-      switch (key) {
-        case 'reboot': {
-          execSync('sudo reboot now');
-          break;
-        }
-        case 'group': {
-          if (group) {
-            await group.detach();
-          }
-          if (value) {
-            group = await client.stateManager.attach('group', value);
-            group.onUpdate(updates => {
-              Object.entries(updates).forEach(([keyG, valueG]) => {
-                switch (keyG) {
-                  case 'sourceData': {
-                    if (valueG) {
-                      const buffer = buffers[valueG.name];
-                      const analysisData = JSON.parse(valueG.data);
-                      // const kdTree = createKDTree.deserialize(analysisData.serializedTree);
-                      synthesisEngine.setBuffer(buffer);
-                      synthesisEngine.setSearchSpace(analysisData.serializedTree, analysisData.times);
-                    }
-                    break;
-                  }
-                  case 'playing': {
-                    synthesisEngine.playing = valueG;
-                    break;
-                  }
-                  case 'volume': {
-                    synthesisEngine.volume = valueG;
-                    break;
-                  }
-                  case 'detune': {
-                    synthesisEngine.detune = valueG;
-                    break;
-                  }
-                  case 'grainPeriod': {
-                    synthesisEngine.grainPeriod = valueG;
-                    break;
-                  }
-                  case 'grainDuration': {
-                    synthesisEngine.grainDuration = valueG;
-                    break;
-                  }
-                  case 'randomizer': {
-                    synthesisEngine.randomizer = valueG;
-                    break;
-                  }
-                }
-              });
-            }, true);
-            group.onDetach(() => {
-              group = null;
-              synthesisEngine.playing = false;
-            });
-          } else {
-            group = null;
-            synthesisEngine.playing = false;
-          }
-          // console.log("after", group);
-          break;
-        }
-      }
-    })
-  });
+  
 
   controllers.onUpdate((state, updates) => {
     Object.entries(updates).forEach(([key, value]) => {
@@ -180,6 +93,29 @@ async function bootstrap() {
         }
       }
     });
+  });
+
+  const buffers = {};
+  for (const fileNode of filesystemSoundbank.getTree().children) {
+    const { useHttps, serverAddress, port } = config.env;
+    const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${fileNode.url}`;
+    // const path = `${config.env.serverAddress}/${fileNode.url}`;
+    const buffer = await audioBufferLoader.load(url);
+    buffers[fileNode.name] = buffer;
+  }
+
+  filesystemSoundbank.onUpdate(async updates => {
+    for (const event of updates.events) {
+      if (event.type === 'create') {
+        const { useHttps, serverAddress, port } = config.env;
+        const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${event.node.url}`;
+        const buffer = await audioBufferLoader.load(url);
+        buffers[event.node.name] = buffer;
+      }
+      if (event.type === 'delete') {
+        delete buffers[event.node.name];
+      }
+    }
   });
 
   //synthesis
@@ -268,8 +204,15 @@ async function bootstrap() {
       source.connect(env);
       source.buffer = this.buffer;
       source.detune.value = this.detune * 100;
-      source.start(now, timeOffset, this.grainDuration);
-      source.stop(now + this.grainDuration);
+
+      //weird error where timeoffset is sometimes undefined here
+      try {
+        source.start(now, timeOffset, this.grainDuration);
+        source.stop(now + this.grainDuration);
+      } catch (error) {
+        console.log('error', now, timeOffset, this.grainDuration)
+        console.log(error)
+      }
     }
 
     tick(time) {
@@ -294,7 +237,6 @@ async function bootstrap() {
   const synthesisEngine = new SynthesisEngine();
 
   scheduler.add(synthesisEngine.tick, audioContext.currentTime);
-  
 
   // audio path
   const outputNode = new GainNode(audioContext);
@@ -311,8 +253,6 @@ async function bootstrap() {
   busNode.connect(compressor);
   compressor.connect(outputNode);
   outputNode.connect(audioContext.destination);
-  
-
 
   // led
   function hexToRgb(hex, factor) {
@@ -362,9 +302,78 @@ async function bootstrap() {
         return time + analyser.fftSize / audioContext.sampleRate;
       }
     }
-    outputNode.connect(analyserEngine);
+    outputNode.connect(analyser);
     scheduler.add(analyserEngine.tick, audioContext.currentTime);
   }
+
+  const satellite = await client.stateManager.create('satellite', { name: os.hostname() });
+  satellite.onUpdate(updates => {
+    Object.entries(updates).forEach(async ([key, value]) => {
+      switch (key) {
+        case 'reboot': {
+          execSync('sudo reboot now');
+          break;
+        }
+        case 'group': {
+          if (group) {
+            await group.detach();
+          }
+          if (value) {
+            group = await client.stateManager.attach('group', value);
+            group.onUpdate(updates => {
+              Object.entries(updates).forEach(([keyG, valueG]) => {
+                switch (keyG) {
+                  case 'sourceData': {
+                    if (valueG) {
+                      const buffer = buffers[valueG.name];
+                      const analysisData = JSON.parse(valueG.data);
+                      // const kdTree = createKDTree.deserialize(analysisData.serializedTree);
+                      synthesisEngine.setBuffer(buffer);
+                      synthesisEngine.setSearchSpace(analysisData.serializedTree, analysisData.times);
+                    }
+                    break;
+                  }
+                  case 'playing': {
+                    synthesisEngine.playing = valueG;
+                    break;
+                  }
+                  case 'volume': {
+                    synthesisEngine.volume = valueG;
+                    break;
+                  }
+                  case 'detune': {
+                    synthesisEngine.detune = valueG;
+                    break;
+                  }
+                  case 'grainPeriod': {
+                    synthesisEngine.grainPeriod = valueG;
+                    break;
+                  }
+                  case 'grainDuration': {
+                    synthesisEngine.grainDuration = valueG;
+                    break;
+                  }
+                  case 'randomizer': {
+                    synthesisEngine.randomizer = valueG;
+                    break;
+                  }
+                }
+              });
+            }, true);
+            group.onDetach(() => {
+              group = null;
+              synthesisEngine.playing = false;
+            });
+          } else {
+            group = null;
+            synthesisEngine.playing = false;
+          }
+          // console.log("after", group);
+          break;
+        }
+      }
+    })
+  });
 
   console.log(`Hello ${client.config.app.name}!`);
 }

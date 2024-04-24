@@ -101,15 +101,9 @@ The elements are the following :
 
 - recorder client
 - cleanup code
-- presets
 - install rpi-daemon
 - test leds
-
-db/
-    groups.json
-    groups-clients-map.json
-    presets/
-
+- loop record mode : automatic record every X seconds
 
 ## License
 BSD-3-Clause

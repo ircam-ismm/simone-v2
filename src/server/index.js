@@ -308,10 +308,12 @@ satellites.onAttach(satellite => {
       return group.get('name') === groupName;
     });
     if (groupState) {
-      satellite.set({group: groupState.id});
+      // TODO : fix this
+      setTimeout(() => satellite.set({group: groupState.id}), 200);
     }
   }
 });
+
 
 controllers.onUpdate((state, updates) => {
   Object.entries(updates).forEach(([key, value]) => {
