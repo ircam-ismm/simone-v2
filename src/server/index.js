@@ -1,6 +1,6 @@
 import '@soundworks/helpers/polyfills.js';
 import { Server } from '@soundworks/core/server.js';
-// import { configureMaxClient } from '@soundworks/max';
+import { configureMaxClient } from '@soundworks/max';
 import { loadConfig } from '../utils/load-config.js';
 import '../utils/catch-unhandled-errors.js';
 
@@ -27,7 +27,7 @@ import { group } from 'console';
 // - Wizard & Tools:        `npx soundworks`
 
 const config = loadConfig(process.env.ENV, import.meta.url);
-// configureMaxClient(config);
+configureMaxClient(config);
 
 console.log(`
 --------------------------------------------------------

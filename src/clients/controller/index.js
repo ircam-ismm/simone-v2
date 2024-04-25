@@ -47,7 +47,6 @@ TODO :
 // - Wizard & Tools:        `npx soundworks`
 
 const config = window.SOUNDWORKS_CONFIG;
-
 const audioContext = new AudioContext(); 
 
 const audioBufferLoader = new AudioBufferLoader({});
@@ -238,6 +237,7 @@ async function main($container) {
 
   micNode.connect(delayNode);
   delayNode.connect(processor);
+  processor.connect(audioContext.destination);
 
     // offline
   class AnalyzerEngine {
@@ -451,11 +451,13 @@ async function main($container) {
 
   // render
   function renderInputPanel() {
+    const now = audioContext.currentTime;
     const $selectCalibration = document.getElementById('select-calibration');
     let loadCalibrationBtnDisabled = true;
     if ($selectCalibration) {
       loadCalibrationBtnDisabled = !$selectCalibration.value || $selectCalibration.value === calibrationLoaded;
     }
+
 
     switch (inputMode) {
       case 'realtime': {
