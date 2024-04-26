@@ -3,7 +3,7 @@ import { Client, Context } from '@soundworks/core/client.js';
 
 import launcher from '@soundworks/helpers/launcher.js';
 
-import { html, render } from 'lit';
+import { html, nothing, render } from 'lit';
 import '../components/sw-audit.js';
 
 import pluginPlatformInit from '@soundworks/plugin-platform-init/client.js';
@@ -450,6 +450,8 @@ async function main($container) {
   }
 
   // render
+  let showMasterControls = false;
+
   function renderInputPanel() {
     const now = audioContext.currentTime;
     const $selectCalibration = document.getElementById('select-calibration');
@@ -869,11 +871,88 @@ async function main($container) {
 
           <!-- controls -->
           <div>
+            <div style="
+              margin-top: 10px;
+              display: flex;
+              flex-direction: row;
+            ">
+              <h2 style="margin: 10px;">master controls</h2>
+              <sc-button
+                style="
+                  
+                  width: 50px;
+                "
+                ?selected=${showMasterControls}
+                @release=${() => {
+                  showMasterControls = !showMasterControls
+                  renderApp();
+                }}
+              >show</sc-button>
+            </div>
+            ${
+              showMasterControls
+              ? html`
+                <div style="
+                  display: flex;
+                  flex-direction: row;
+                  flex-wrap: wrap;
+                  padding: 0 10px 5px;
+                  border-bottom: solid 2px var(--sw-lighter-background-color);
+                ">
+
+                  <div style="
+                    margin-right: 10px;
+                  ">
+                    <p>source</p>
+                    <sc-select
+                      options=${JSON.stringify(filesystemSoundbank.getTree().children.map(e => e.name))}
+                      placeholder="select source"
+                      @change=${e => groups.forEach(group => {
+                        if (e.detail.value) {
+                          group.set({ sourceName: e.detail.value })
+                        }
+                      })}
+                    ></sc-select>
+                  </div>
+                  ${synthesisParams.map(param => {
+                    const groupsSchema = groups.getSchema();
+                    return html`
+                      <div
+                        style="
+                          margin-right: 10px;
+                        "
+                      >
+                        <p>${param}</p>
+                        <sc-slider 
+                          id="master-${param}"
+                          style="
+                            width: 200px;
+                          "
+                          number-box
+                          min=${groupsSchema[param].min}
+                          max=${groupsSchema[param].max}
+                          @input=${e => {
+                            groups.forEach(group => {
+                              const update = {};
+                              update[param] = e.detail.value
+                              group.set(update);
+                            });
+                          }}
+                        ></sc-slider>
+                      </div>
+                    `
+                  })}
+                </div>
+              ` 
+              : nothing
+            }
+            
             <sc-midi
               style="
                 margin: 10px 20px;
               "
             ></sc-midi>
+            
             <div style="
               flex-grow: 2;
               overflow: hidden;
@@ -930,7 +1009,11 @@ async function main($container) {
                         value=${group.get('sourceName')}
                         options=${JSON.stringify(filesystemSoundbank.getTree().children.map(e => e.name))}
                         placeholder="select source"
-                        @change=${e => group.set({sourceName: e.detail.value})}
+                        @change=${e => {
+                          if (e.detail.value) {
+                            group.set({ sourceName: e.detail.value })
+                          }
+                        }}
                       ></sc-select>
                     </div>
                     ${synthesisParams.map(param => {
