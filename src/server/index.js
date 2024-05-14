@@ -158,7 +158,7 @@ function saveGroups() {
 }
 
 function saveSatellitesGroupsMap() {
-  const map = {}
+  const map = JSON.parse(fs.readFileSync(filesystemPresets.getTree().children.find(e => e.name === "groups-satellites-map.json").path));
   satellites.forEach(satellite => {
     const group = groups.get(satellite.get('group'));
     if (group) {

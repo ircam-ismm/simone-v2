@@ -359,9 +359,18 @@ async function main($container) {
   groups.onDetach(() => renderApp());
 
   const satellites = await client.stateManager.getCollection('satellite');
-  satellites.onAttach(() => renderApp());
-  satellites.onUpdate(() => renderApp());
-  satellites.onDetach(() => renderApp());
+  satellites.onAttach(() => {
+    satellites.sort((a, b) => a.get('name') < b.get('name') ? -1 : 1)
+    renderApp()
+  });
+  satellites.onUpdate(() => {
+    satellites.sort((a, b) => a.get('name') < b.get('name') ? -1 : 1)
+    renderApp()
+  });
+  satellites.onDetach(() => {
+    satellites.sort((a, b) => a.get('name') < b.get('name') ? -1 : 1)
+    renderApp()
+  });
 
   const deleteAllGroups = () => {
     groups.forEach(group => {

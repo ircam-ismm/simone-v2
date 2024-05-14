@@ -37,12 +37,13 @@ const audioContext = new AudioContext();
 const audioBufferLoader = new AudioBufferLoader({});
 
 const LED_BUFFER_SIZE = 4096;
+const DEBUG = false;
 
 async function bootstrap() {
   /**
    * Load configuration from config files and create the soundworks client
    */
-  const ledClient = (typeof (process.env.EMULATE) !== 'undefined'
+  const ledClient = (DEBUG
     ? null
     : new Client({ role: 'dotpi-led-client', ...ledConfig }));
 
@@ -76,24 +77,10 @@ async function bootstrap() {
   }
 
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
-
   
   const controllers = await client.stateManager.getCollection('controller');
   const global = await client.stateManager.attach('global');
   let group = null;
-
-  
-
-  controllers.onUpdate((state, updates) => {
-    Object.entries(updates).forEach(([key, value]) => {
-      switch (key) {
-        case 'analysisData': {
-          synthesisEngine.setTarget(value)
-          break;
-        }
-      }
-    });
-  });
 
   const buffers = {};
   for (const fileNode of filesystemSoundbank.getTree().children) {
@@ -305,6 +292,17 @@ async function bootstrap() {
     outputNode.connect(analyser);
     scheduler.add(analyserEngine.tick, audioContext.currentTime);
   }
+
+  controllers.onUpdate((state, updates) => {
+    Object.entries(updates).forEach(([key, value]) => {
+      switch (key) {
+        case 'analysisData': {
+          synthesisEngine.setTarget(value)
+          break;
+        }
+      }
+    });
+  });
 
   const satellite = await client.stateManager.create('satellite', { name: os.hostname() });
   satellite.onUpdate(updates => {
