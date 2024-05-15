@@ -273,7 +273,7 @@ async function main($container) {
     }
 
     stop() {
-      this.active = false
+      this.active = false;
     }
 
     tick(time) {
@@ -411,6 +411,7 @@ async function main($container) {
           // update waveform 
           loadedTargetBuffer = buffer;
           renderApp();
+          break;
         }
       }
     });
@@ -705,13 +706,13 @@ async function main($container) {
             value=${inputMode}
             options="${JSON.stringify(['realtime', 'loop record', 'loop load'])}"
             @change=${e => {
-            active = false;
-            analyzerEngine.stop();
-            recordedBuffer = null;
-            loadedTargetBuffer = null;
-            inputMode = e.detail.value;
-            renderApp();
-          }}
+              active = false;
+              analyzerEngine.stop();
+              recordedBuffer = null;
+              loadedTargetBuffer = null;
+              inputMode = e.detail.value;
+              renderApp();
+            }}
           ></sc-tab>
           ${renderInputPanel()}
         </div>
@@ -1041,11 +1042,7 @@ async function main($container) {
                             min=${schema[param].min}
                             max=${schema[param].max}
                             value=${group.get(param)}
-                            @input=${e => {
-                              const update = {}
-                              update[param] = e.detail.value;
-                              group.set(update);
-                            }}
+                            @input=${e => group.set({ [param]: e.detail.value })}
                           ></sc-slider>
                         </div>
                       `

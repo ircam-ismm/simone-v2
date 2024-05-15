@@ -110,8 +110,6 @@ async function bootstrap() {
 
   class SynthesisEngine {
     constructor() {
-      this.jitter = 0.004;
-
       this.playing = false;
 
       this.detune = 0;
@@ -151,7 +149,7 @@ async function bootstrap() {
     
     set volume(value) {
       const now = audioContext.currentTime;
-      this.output.gain.linearRampToValueAtTime(dbtoa(value), now + 0.05);
+      this.output.gain.setTargetAtTime(dbtoa(value), now, 0.01);
     }
 
     set randomizer(value) {
@@ -168,23 +166,21 @@ async function bootstrap() {
       this.output.connect(dest);
     }
 
-    play(time, targets, rms, randomizer) {
-      const randK = Math.floor(Math.random() * randomizer);
+    play(time, targets, rms) {
+      time = Math.max(time, audioContext.currentTime);
+
+      const randK = Math.floor(Math.random() * targets.length);
       const target = targets[randK];
       const timeOffset = this.times[target];
 
-      const rand = Math.random() * this.jitter;
+      const rand = Math.random() * 0.004;
       const now = time + rand;
 
-      const rmsGain = new GainNode(audioContext);
-      rmsGain.connect(this.output);
-      rmsGain.gain.value = rms;
-
       const env = new GainNode(audioContext);
-      env.connect(rmsGain);
+      env.connect(this.output);
       env.gain.value = 0;
       env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(1, now + (this.grainDuration / 2));
+      env.gain.linearRampToValueAtTime(rms, now + (this.grainDuration / 2));
       env.gain.linearRampToValueAtTime(0, now + this.grainDuration);
 
       const source = new AudioBufferSourceNode(audioContext);
@@ -194,7 +190,7 @@ async function bootstrap() {
 
       //weird error where timeoffset is sometimes undefined here
       try {
-        source.start(now, timeOffset, this.grainDuration);
+        source.start(now, timeOffset);
         source.stop(now + this.grainDuration);
       } catch (error) {
         console.log('error', now, timeOffset, this.grainDuration)
@@ -203,7 +199,7 @@ async function bootstrap() {
     }
 
     tick(time) {
-      time = Math.max(time, audioContext.currentTime);
+      time = Math.max(time + this.grainPeriod/2, audioContext.currentTime);
       if (this.playing && this.kdTree && this.currGrainMfcc) {
         this.searchWorker.postMessage({
           type: 'target',
@@ -227,18 +223,16 @@ async function bootstrap() {
 
   // audio path
   const outputNode = new GainNode(audioContext);
-  const compressor = new DynamicsCompressorNode(audioContext, {
-    threshold: -30,
-    knee: 0.1,
-    ratio: 2,
-    attack: 0.01,
-    release: 0.1,
-  });
-  const busNode = new GainNode(audioContext);
+  // const compressor = new DynamicsCompressorNode(audioContext, {
+  //   threshold: -30,
+  //   knee: 0.1,
+  //   ratio: 2,
+  //   attack: 0.01,
+  //   release: 0.1,
+  // });
 
-  synthesisEngine.connect(busNode);
-  busNode.connect(compressor);
-  compressor.connect(outputNode);
+  synthesisEngine.connect(outputNode);
+  // compressor.connect(outputNode);
   outputNode.connect(audioContext.destination);
 
   // led
@@ -289,7 +283,7 @@ async function bootstrap() {
         return time + analyser.fftSize / audioContext.sampleRate;
       }
     }
-    outputNode.connect(analyser);
+    // outputNode.connect(analyser);
     scheduler.add(analyserEngine.tick, audioContext.currentTime);
   }
 

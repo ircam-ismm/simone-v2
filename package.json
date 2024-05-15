@@ -19,7 +19,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@ircam/sc-components": "^3.0.0-alpha.58",
+    "@ircam/sc-components": "^3.0.0-alpha.60",
     "@ircam/sc-loader": "^1.0.0-alpha.1",
     "@ircam/sc-scheduling": "^0.1.6",
     "@ircam/sc-utils": "^1.3.3",
@@ -32,7 +32,7 @@
     "audiobuffer-to-wav": "^1.0.0",
     "json5": "^2.2.2",
     "lit": "^3.0.2",
-    "node-web-audio-api": "^0.18.0",
+    "node-web-audio-api": "^0.20.0",
     "static-kdtree": "^1.0.2"
   },
   "devDependencies": {

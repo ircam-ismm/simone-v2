@@ -100,10 +100,10 @@ The elements are the following :
 ## TODO 
 
 - recorder client
-- cleanup code
-- install rpi-daemon
-- test leds
 - loop record mode : automatic record every X seconds
+- Play/stop in master controls
+- Timer for changing source file
+- fix clicks (pb with enveloppe and grain start time) ?
 
 ## License
 BSD-3-Clause
