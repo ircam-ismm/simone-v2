@@ -37,11 +37,7 @@
   },
   "devDependencies": {
     "@ircam/eslint-config": "^1.2.1",
-<<<<<<< HEAD
     "@soundworks/build": "^1.0.0-alpha.2",
-=======
-    "@soundworks/build": "1.0.0-alpha.0",
->>>>>>> aa8d69fbaeec61875a4bb8a81669d15da5d14eae
     "@soundworks/create": "^1.0.0-alpha.19",
     "concurrently": "^8.2.2",
     "eslint": "^8.57.0",
