@@ -53,7 +53,8 @@ const audioBufferLoader = new AudioBufferLoader({});
 
 const analysisParams = {
   frameSize: 1024,
-  hopSize: 512,
+  hopSize: 2048,
+  displayFrame: 512,
   sampleRate: audioContext.sampleRate,
   mfccBands: 24,
   mfccCoefs: 12,
@@ -187,6 +188,8 @@ async function main($container) {
   }
   let analysisBufferIndex = 0;
   const processor = audioContext.createScriptProcessor(analysisParams.hopSize);
+  const displaySignalProcessor = audioContext.createScriptProcessor(analysisParams.displayFrame);
+
   let active = false;
   let means = [];
   let std = [];
@@ -198,17 +201,23 @@ async function main($container) {
   let maxRms = 1;
 
   processor.addEventListener('audioprocess', event => {
-    const $signalMic = document.getElementById('signal-mic');
     if (active) {
       const inputBuffer = event.inputBuffer;
       const inputData = inputBuffer.getChannelData(0);
 
-      for (let i = 0; i < analysisBuffer.length - inputData.length; i++) {
-        analysisBuffer[i] = analysisBuffer[i + inputData.length];
-      } 
-      for (let i = 0; i < inputData.length; i++) {
-        analysisBuffer[i + analysisBuffer.length - inputData.length] = inputData[i]; 
-      } 
+      // in case hop size is > than frame size we do not use all data
+      if (analysisParams.hopSize < analysisParams.frameSize) {
+        for (let i = 0; i < analysisBuffer.length - inputData.length; i++) {
+          analysisBuffer[i] = analysisBuffer[i + inputData.length];
+        } 
+        for (let i = 0; i < inputData.length; i++) {
+          analysisBuffer[i + analysisBuffer.length - inputData.length] = inputData[i]; 
+        } 
+      } else { 
+        for (let i = 0; i < analysisBuffer.length; i++) {
+          analysisBuffer[i] = inputData[i];
+        } 
+      }
 
       const targetMfcc = mfcc.get(analysisBuffer);
       for (let j = 0; j < analysisParams.mfccCoefs; j++) {
@@ -227,17 +236,32 @@ async function main($container) {
       targetRms = Math.max(Math.min(targetRms, 1), 0);
 
       controller.set({ analysisData: [targetMfcc, targetRms] });
+    }
+  });
 
+  displaySignalProcessor.addEventListener('audioprocess', event => {
+    const $signalMic = document.getElementById('signal-mic');
+    if (active) {
+      const inputBuffer = event.inputBuffer;
+      const inputData = inputBuffer.getChannelData(0);
+      let rms = 0;
+      for (let k = 0; k < inputData.length; k++) {
+        rms += inputData[k] ** 2;
+      }
+      rms = Math.sqrt(rms / inputData.length);
       $signalMic.value = {
         time: audioContext.currentTime,
-        data: targetRms,
+        data: rms,
       }
     }
   });
 
+
   micNode.connect(delayNode);
   delayNode.connect(processor);
+  delayNode.connect(displaySignalProcessor);
   processor.connect(audioContext.destination);
+  displaySignalProcessor.connect(audioContext.destination);
 
     // offline
   class AnalyzerEngine {
@@ -411,6 +435,24 @@ async function main($container) {
           // update waveform 
           loadedTargetBuffer = buffer;
           renderApp();
+          break;
+        }
+        case 'grainPeriod': {
+          groups.forEach(group => {
+            group.set({grainPeriod: value});
+          });
+          break;
+        }
+        case 'grainDuration': {
+          groups.forEach(group => {
+            group.set({ grainDuration: value });
+          });
+          break;
+        }
+        case 'volume': {
+          groups.forEach(group => {
+            group.set({ volume: value });
+          });
           break;
         }
       }

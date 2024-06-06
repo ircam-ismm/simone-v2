@@ -13,10 +13,10 @@ export default {
     default: null,
     nullable: true,
   }, 
-  sourceData: {
-    type: 'any',
+  sourceState: {
+    type: 'integer',
     default: null,
-    nullable: true,
+    nullable: true
   },
   playing: {
     type: 'boolean',
@@ -37,7 +37,7 @@ export default {
   grainPeriod: {
     type: 'float',
     default: 0.1,
-    min: 0.01,
+    min: 0.05,
     max: 0.5,
   },
   grainDuration: {

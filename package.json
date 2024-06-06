@@ -32,12 +32,12 @@
     "audiobuffer-to-wav": "^1.0.0",
     "json5": "^2.2.2",
     "lit": "^3.0.2",
-    "node-web-audio-api": "^0.20.0",
+    "node-web-audio-api": "0.18.0",
     "static-kdtree": "^1.0.2"
   },
   "devDependencies": {
     "@ircam/eslint-config": "^1.2.1",
-    "@soundworks/build": "^1.0.0-alpha.0",
+    "@soundworks/build": "^1.0.0-alpha.2",
     "@soundworks/create": "^1.0.0-alpha.19",
     "concurrently": "^8.2.2",
     "eslint": "^8.57.0",

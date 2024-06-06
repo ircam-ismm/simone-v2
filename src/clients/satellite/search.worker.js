@@ -15,8 +15,6 @@ parentPort.on('message', e => {
       data: {
         targets: targets,
         rms: data.rms,
-        randomizer: data.randomizer,
-        time: data.time,
       }
     });
   }

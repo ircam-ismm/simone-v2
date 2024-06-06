@@ -13,6 +13,7 @@ import pluginFilesystem from '@soundworks/plugin-filesystem/server.js';
 import globalSchema from './schemas/global.js';
 import controllerSchema from './schemas/controller.js';
 import groupSchema from './schemas/group.js';
+import sourceSchema from './schemas/source.js';
 import satelliteSchema from './schemas/satellite.js';
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
@@ -73,6 +74,7 @@ server.pluginManager.register('filesystem-presets', pluginFilesystem, {
 server.stateManager.registerSchema('global', globalSchema);
 server.stateManager.registerSchema('controller', controllerSchema);
 server.stateManager.registerSchema('group', groupSchema);
+server.stateManager.registerSchema('source', sourceSchema);
 server.stateManager.registerSchema('satellite', satelliteSchema);
 
 /**
@@ -143,6 +145,7 @@ filesystemSoundbank.onUpdate(async updates => {
 
 const global = await server.stateManager.create('global');
 const groups = new Map();
+const groupsSources = new Map();
 const satellites = await server.stateManager.getCollection('satellite');
 const controllers = await server.stateManager.getCollection('controller');
 
@@ -176,13 +179,15 @@ global.set({presets});
 
 groupsList.forEach(async value => {
   const group = await server.stateManager.create('group', value);
+  const groupSource = await server.stateManager.create('source');
+  group.set({sourceState: groupSource.id});
   group.onUpdate(updates => {
     if ('sourceName' in updates && updates.sourceName !== null) {
       const sourceNameSplit = updates.sourceName.split('.')[0];
       const analysisFilename = `data_analysis_${sourceNameSplit}.json`
       const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
       const analysisData = fs.readFileSync(pathData, 'utf8');
-      group.set({
+      groupSource.set({
         sourceData: {
           name: updates.sourceName,
           data: analysisData
@@ -209,14 +214,18 @@ global.onUpdate(update => {
       }
       case 'createGroup': {
         const group = await server.stateManager.create('group');
-        await group.set({name: `group-${group.id}`});
+        const groupSource = await server.stateManager.create('source');
+        await group.set({
+          name: `group-${group.id}`,
+          sourceState: groupSource.id,
+        });
         group.onUpdate(updates => {
           if ('sourceName' in updates) {
             const sourceNameSplit = updates.sourceName.split('.')[0];
             const analysisFilename = `data_analysis_${sourceNameSplit}.json`
             const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
             const analysisData = fs.readFileSync(pathData, 'utf8');
-            group.set({sourceData: {
+            groupSource.set({sourceData: {
               name: updates.sourceName,
               data: analysisData 
             }});
@@ -224,19 +233,24 @@ global.onUpdate(update => {
         });
 
         groups.set(group.id, group);
+        groupsSources.set(group.id, groupSource);
         saveGroups();
         break;
       }
       case 'createSingleGroup': {
         const group = await server.stateManager.create('group');
-        await group.set({ name: `group-${group.id}` });
+        const groupSource = await server.stateManager.create('source');
+        await group.set({ 
+          name: `group-${group.id}`,
+          sourceState: groupSource.id
+        });
         group.onUpdate(updates => {
           if ('sourceName' in updates) {
             const sourceNameSplit = updates.sourceName.split('.')[0];
             const analysisFilename = `data_analysis_${sourceNameSplit}.json`
             const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
             const analysisData = fs.readFileSync(pathData, 'utf8');
-            group.set({
+            groupSource.set({
               sourceData: {
                 name: updates.sourceName,
                 data: analysisData
@@ -246,6 +260,7 @@ global.onUpdate(update => {
         });
 
         groups.set(group.id, group);
+        groupsSources.set(group.id, groupSource);
         satellites.forEach(satellite => {
           satellite.set({group: group.id});
         });
@@ -257,13 +272,15 @@ global.onUpdate(update => {
           const group = await server.stateManager.create('group', {
             name: satellite.get('name'),
           });
+          const groupSource = await server.stateManager.create('source');
+          group.set({ sourceState: groupSource.id });
           group.onUpdate(updates => {
             if ('sourceName' in updates) {
               const sourceNameSplit = updates.sourceName.split('.')[0];
               const analysisFilename = `data_analysis_${sourceNameSplit}.json`
               const pathData = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename).path;
               const analysisData = fs.readFileSync(pathData, 'utf8');
-              group.set({
+              groupSource.set({
                 sourceData: {
                   name: updates.sourceName,
                   data: analysisData
@@ -273,6 +290,7 @@ global.onUpdate(update => {
           });
 
           groups.set(group.id, group);
+          groupsSources.set(group.id, groupSource);
           satellite.set({ group: group.id });
           saveGroups();
         });
@@ -280,8 +298,11 @@ global.onUpdate(update => {
       }
       case 'deleteGroup': {
         const group = groups.get(value);
+        const groupSource = groupsSources.get(value);
         groups.delete(group.id);
+        groupsSources.delete(group.id);
         await group.delete();
+        await groupSource.delete();
         saveGroups();
         break;
       }
