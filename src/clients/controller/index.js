@@ -49,7 +49,7 @@ TODO :
 const config = window.SOUNDWORKS_CONFIG;
 const audioContext = new AudioContext(); 
 
-const audioBufferLoader = new AudioBufferLoader({});
+const audioBufferLoader = new AudioBufferLoader(audioContext);
 
 const analysisParams = {
   frameSize: 1024,

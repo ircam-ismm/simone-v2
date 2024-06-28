@@ -82,7 +82,7 @@ server.stateManager.registerSchema('satellite', satelliteSchema);
  */
 await server.start();
 
-const audioBufferLoader = new AudioBufferLoader({});
+const audioBufferLoader = new AudioBufferLoader(48000);
 
 const filesystemSoundbank = await server.pluginManager.get('filesystem-soundbank');
 const filesystemAnalysis = await server.pluginManager.get('filesystem-analysis');
@@ -108,6 +108,7 @@ filesystemSoundbank.getTree().children.forEach(async e => {
   const file = filesystemAnalysis.getTree().children.find(e => e.name === analysisFilename);
   if (!file) {
     const buffer = await audioBufferLoader.load(e.path);
+    console.log(buffer);
     worker.postMessage({
       type: 'analyze-soundfile',
       data: {

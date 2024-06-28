@@ -30,7 +30,7 @@ import { performance } from 'node:perf_hooks';
 
 const audioContext = new AudioContext(); 
 
-const audioBufferLoader = new AudioBufferLoader({});
+const audioBufferLoader = new AudioBufferLoader(audioContext);
 
 
 const DEBUG = false;
