@@ -1,5 +1,5 @@
 {
-  name: 'simone-realtime',
+  name: 'simone-v2',
   author: '',
   clients: {
     controller: {

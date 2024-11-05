@@ -32,19 +32,12 @@ import '@ircam/sc-components/sc-dragndrop.js';
 import '@ircam/sc-components/sc-midi.js';
 import '@ircam/sc-components/sc-color-picker.js';
 
-/*
-TODO : 
-
-- analyse file when dragndrop
-- loop record mode
-
-
-*/
 
 // - General documentation: https://soundworks.dev/
 // - API documentation:     https://soundworks.dev/api
 // - Issue Tracker:         https://github.com/collective-soundworks/soundworks/issues
 // - Wizard & Tools:        `npx soundworks`
+
 
 const config = window.SOUNDWORKS_CONFIG;
 const audioContext = new AudioContext(); 
@@ -75,7 +68,7 @@ async function main($container) {
   });
 
   await client.start();
-
+  
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
   filesystemSoundbank.onUpdate(() => renderApp());
 
@@ -84,6 +77,7 @@ async function main($container) {
 
   const global = await client.stateManager.attach('global');
   const controller = await client.stateManager.create('controller');
+  
 
   let inputMode = 'realtime';
 
@@ -877,6 +871,7 @@ async function main($container) {
                         let groupId = group ? group.id : null;  
                         console.log(groupId)
                         satellite.set({group: groupId});
+                        global.set({saveGroupsSatellitesMap: true});
                       }}
                     ></sc-select>
                     <div style="

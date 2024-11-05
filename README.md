@@ -103,6 +103,7 @@ The elements are the following :
 - loop record mode : automatic record every X seconds
 - Play/stop in master controls
 - Timer for changing source file
+- loading seems very long for long soundfile
 
 
 ## License

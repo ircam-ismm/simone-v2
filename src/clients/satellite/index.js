@@ -76,6 +76,7 @@ async function bootstrap() {
   let group = null;
   let groupSource = null;
 
+
   // load buffers
   const buffers = {};
   for (const fileNode of filesystemSoundbank.getTree().children) {

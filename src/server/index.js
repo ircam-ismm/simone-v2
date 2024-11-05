@@ -266,10 +266,11 @@ global.onUpdate(update => {
           satellite.set({group: group.id});
         });
         saveGroups();
+        saveSatellitesGroupsMap();
         break;
       }
       case 'createOneGroupPerClient': {
-        satellites.forEach(async satellite => {
+        for (const satellite of satellites) {
           const group = await server.stateManager.create('group', {
             name: satellite.get('name'),
           });
@@ -293,8 +294,13 @@ global.onUpdate(update => {
           groups.set(group.id, group);
           groupsSources.set(group.id, groupSource);
           satellite.set({ group: group.id });
-          saveGroups();
-        });
+        }
+        saveGroups();
+        saveSatellitesGroupsMap();
+        break;
+      }
+      case 'saveGroupsSatellitesMap': {
+        saveSatellitesGroupsMap();
         break;
       }
       case 'deleteGroup': {
@@ -303,7 +309,7 @@ global.onUpdate(update => {
         groups.delete(group.id);
         groupsSources.delete(group.id);
         await group.delete();
-        await groupSource.delete();
+        groupSource ? await groupSource.delete(): null;
         saveGroups();
         break;
       }
@@ -311,15 +317,6 @@ global.onUpdate(update => {
   });
 });
 
-satellites.onUpdate((state, updates) => {
-  Object.entries(updates).forEach(([key, value]) => {
-    switch (key) {
-      case 'group':
-        saveSatellitesGroupsMap();
-        break;
-    }
-  });
-});
 
 satellites.onAttach(satellite => {
   const groupsSatellitesMap = JSON.parse(fs.readFileSync(filesystemPresets.getTree().children.find(e => e.name === "groups-satellites-map.json").path));

@@ -34,6 +34,11 @@ export default {
     min: -12,
     max: 12,
   },
+  presets: {
+    type: 'any',
+    default: true,
+    nullable: true,
+  },
   grainPeriod: {
     type: 'float',
     default: 0.1,

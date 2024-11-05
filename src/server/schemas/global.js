@@ -24,6 +24,10 @@ export default {
     type: 'boolean',
     event: true,
   },
+  saveGroupsSatellitesMap: {
+    type: 'boolean',
+    event: true,
+  },
   deleteGroup: {
     type: 'integer',
     event: true,
