@@ -158,7 +158,7 @@ function saveGroups() {
       color: group.get('color'),
     });
   });
-  filesystemPresets.writeFile('groups.json', JSON.stringify(groupsList));
+  filesystemPresets.writeFile('groups.json', JSON.stringify(groupsList, null, 2));
 }
 
 function saveSatellitesGroupsMap() {
@@ -169,7 +169,7 @@ function saveSatellitesGroupsMap() {
       map[satellite.get('name')] = group.get('name');
     }
   }); 
-  filesystemPresets.writeFile('groups-satellites-map.json', JSON.stringify(map));
+  filesystemPresets.writeFile('groups-satellites-map.json', JSON.stringify(map, null, 2));
 }
 
 // load existing group config and presets
@@ -275,7 +275,7 @@ global.onUpdate(update => {
             name: satellite.get('name'),
           });
           const groupSource = await server.stateManager.create('source');
-          group.set({ sourceState: groupSource.id });
+          await group.set({ sourceState: groupSource.id });
           group.onUpdate(updates => {
             if ('sourceName' in updates) {
               const sourceNameSplit = updates.sourceName.split('.')[0];
@@ -291,9 +291,9 @@ global.onUpdate(update => {
             }
           });
 
-          groups.set(group.id, group);
-          groupsSources.set(group.id, groupSource);
-          satellite.set({ group: group.id });
+          await groups.set(group.id, group);
+          await groupsSources.set(group.id, groupSource);
+          await satellite.set({ group: group.id });
         }
         saveGroups();
         saveSatellitesGroupsMap();

@@ -1,0 +1,10 @@
+name: simone-v2
+author: ""
+clients:
+  controller:
+    target: browser
+    default: true
+  satellite:
+    target: node
+  recorder:
+    target: browser

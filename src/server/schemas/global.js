@@ -24,7 +24,7 @@ export default {
     type: 'boolean',
     event: true,
   },
-  saveGroupsSatellitesMap: {
+  saveGroupsSatellitesMap: {
     type: 'boolean',
     event: true,
   },

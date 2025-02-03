@@ -1,5 +1,7 @@
 {
   "name": "simone-realtime",
   "eslint": true,
-  "language": "js"
+  "language": "js",
+  "configFormat": "yaml",
+  "createVersion": "1.0.0-alpha.23"
 }
