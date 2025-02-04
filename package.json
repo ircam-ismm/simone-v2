@@ -24,7 +24,7 @@
     "@ircam/sc-scheduling": "^1.0.0",
     "@ircam/sc-utils": "^1.9.0",
     "@soundworks/core": "^5.0.0",
-    "@soundworks/helpers": "^5.0.0",
+    "@soundworks/helpers": "^5.0.2",
     "@soundworks/plugin-filesystem": "^5.0.0",
     "@soundworks/plugin-platform-init": "^5.0.0",
     "@soundworks/plugin-sync": "^5.0.0",
