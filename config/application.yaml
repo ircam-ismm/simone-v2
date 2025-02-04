@@ -2,9 +2,9 @@ name: simone-v2
 author: ""
 clients:
   controller:
-    target: browser
+    runtime: browser
     default: true
   satellite:
-    target: node
+    runtime: node
   recorder:
-    target: browser
+    runtime: browser

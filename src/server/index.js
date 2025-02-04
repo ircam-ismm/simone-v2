@@ -1,7 +1,7 @@
 import '@soundworks/helpers/polyfills.js';
 import { Server } from '@soundworks/core/server.js';
-import { configureMaxClient } from '@soundworks/max';
-import { loadConfig } from '../utils/load-config.js';
+// import { configureMaxClient } from '@soundworks/max'; // to be tested
+import { loadConfig, configureHttpRouter } from '@soundworks/helpers/server.js';
 import '../utils/catch-unhandled-errors.js';
 
 import fs from 'fs';
@@ -17,10 +17,6 @@ import sourceSchema from './schemas/source.js';
 import satelliteSchema from './schemas/satellite.js';
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
-import satellite from './schemas/satellite.js';
-import { group } from 'console';
-
-
 
 // - General documentation: https://soundworks.dev/
 // - API documentation:     https://soundworks.dev/api
@@ -28,7 +24,7 @@ import { group } from 'console';
 // - Wizard & Tools:        `npx soundworks`
 
 const config = loadConfig(process.env.ENV, import.meta.url);
-configureMaxClient(config);
+// configureMaxClient(config);
 
 console.log(`
 --------------------------------------------------------
@@ -41,8 +37,7 @@ console.log(`
  * Create the soundworks server
  */
 const server = new Server(config);
-// configure the server for usage within this application template
-server.useDefaultApplicationTemplate();
+configureHttpRouter(server);
 
 /**
  * Register plugins and schemas
@@ -71,11 +66,11 @@ server.pluginManager.register('filesystem-presets', pluginFilesystem, {
   publicPath: 'presets'
 });
 
-server.stateManager.registerSchema('global', globalSchema);
-server.stateManager.registerSchema('controller', controllerSchema);
-server.stateManager.registerSchema('group', groupSchema);
-server.stateManager.registerSchema('source', sourceSchema);
-server.stateManager.registerSchema('satellite', satelliteSchema);
+server.stateManager.defineClass('global', globalSchema);
+server.stateManager.defineClass('controller', controllerSchema);
+server.stateManager.defineClass('group', groupSchema);
+server.stateManager.defineClass('source', sourceSchema);
+server.stateManager.defineClass('satellite', satelliteSchema);
 
 /**
  * Launch application (init plugins, http server, etc.)
@@ -88,10 +83,11 @@ const filesystemSoundbank = await server.pluginManager.get('filesystem-soundbank
 const filesystemAnalysis = await server.pluginManager.get('filesystem-analysis');
 const filesystemPresets = await server.pluginManager.get('filesystem-presets');
 
-// soundfiles analysis 
-const worker = new Worker('./src/server/utils/mfcc.worker.js');
+// soundfiles analysis
+const worker = new Worker('./src/server/mfcc.worker.js');
 worker.on('message', e => {
-  if (e.type === 'analyse-soundfile') {
+  if (e.type === 'analyze-soundfile') {
+    console.log('analysis done');
     // save analysis data to file
     const bufferName = e.data.filename.split('.')[0];
     const filename = `data_analysis_${bufferName}.json`;
@@ -168,7 +164,8 @@ function saveSatellitesGroupsMap() {
     if (group) {
       map[satellite.get('name')] = group.get('name');
     }
-  }); 
+
+  });
   filesystemPresets.writeFile('groups-satellites-map.json', JSON.stringify(map, null, 2));
 }
 
@@ -228,7 +225,7 @@ global.onUpdate(update => {
             const analysisData = fs.readFileSync(pathData, 'utf8');
             groupSource.set({sourceData: {
               name: updates.sourceName,
-              data: analysisData 
+              data: analysisData
             }});
           }
         });
@@ -241,7 +238,7 @@ global.onUpdate(update => {
       case 'createSingleGroup': {
         const group = await server.stateManager.create('group');
         const groupSource = await server.stateManager.create('source');
-        await group.set({ 
+        await group.set({
           name: `group-${group.id}`,
           sourceState: groupSource.id
         });
@@ -340,7 +337,7 @@ controllers.onUpdate((state, updates) => {
       case 'loadCalibrationFile': {
         const path = `${pathCalibration}/${value}`
         const data = fs.readFileSync(path, 'utf8');
-        
+
         state.set({calibrationFileRead: {
           filename: value,
           data

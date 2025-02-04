@@ -10,10 +10,9 @@ import pluginPlatformInit from '@soundworks/plugin-platform-init/client.js';
 import pluginFilesystem from '@soundworks/plugin-filesystem/client.js';
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
-import { Scheduler } from '@ircam/sc-scheduling'; 
+import { Scheduler } from '@ircam/sc-scheduling';
 
-import Mfcc from '../utils/Mfcc.js';
-import mfccWorkerString from '../utils/mfcc.worker.js?inline';
+import Mfcc from '../../../public/Mfcc.js';
 
 import '@ircam/sc-components/sc-toggle.js';
 import '@ircam/sc-components/sc-separator.js';
@@ -40,7 +39,7 @@ import '@ircam/sc-components/sc-color-picker.js';
 
 
 const config = window.SOUNDWORKS_CONFIG;
-const audioContext = new AudioContext(); 
+const audioContext = new AudioContext();
 
 const audioBufferLoader = new AudioBufferLoader(audioContext);
 
@@ -68,7 +67,7 @@ async function main($container) {
   });
 
   await client.start();
-  
+
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
   filesystemSoundbank.onUpdate(() => renderApp());
 
@@ -77,13 +76,17 @@ async function main($container) {
 
   const global = await client.stateManager.attach('global');
   const controller = await client.stateManager.create('controller');
-  
+
 
   let inputMode = 'realtime';
 
-  const workerBlob = new Blob([mfccWorkerString], { type: 'text/javascript' });
-  const workerUrl = URL.createObjectURL(workerBlob);
-  const analysisWorker = new Worker(workerUrl);
+  // const res = await fetch('./mfcc.worker.js');
+  // const mfccWorkerString = await res.text();
+  // const workerBlob = new Blob([mfccWorkerString], { type: 'text/javascript' });
+  // const workerUrl = URL.createObjectURL(workerBlob);
+  const analysisWorker = new Worker('./mfcc.worker.js', {
+    type: 'module'
+  });
 
   analysisWorker.postMessage({
     type: 'message',
@@ -95,13 +98,14 @@ async function main($container) {
     if (type === "message") {
       console.log(data);
     }
+
     if (type === "analyze-calibration") {
       // analysisEngine.setNorm(data.means, data.std, data.minRms, data.maxRms);
       means = data.means;
       std = data.std;
       minRms = data.minRms;
       maxRms = data.maxRms;
-      // save in file 
+      // save in file
       const now = new Date();
       const filename = `calibration-${now.getFullYear()}${now.getMonth()}${now.getDate()}-${now.getHours()}${now.getMinutes()}${now.getSeconds()}.txt`;
       filesystemCalibration.writeFile(filename, JSON.stringify(data));
@@ -120,21 +124,21 @@ async function main($container) {
       });
       const bufferData = buffer.getChannelData(0);
       for (let i = 0; i < buffer.length; i++) {
-        bufferData[i] = data.buffer[i]; 
+        bufferData[i] = data.buffer[i];
       }
       // update engine
       const {means, std, minRms, maxRms} = data;
       const norms = {
-        means, 
-        std, 
-        minRms, 
+        means,
+        std,
+        minRms,
         maxRms
       };
       analyzerEngine.buffer = buffer;
       analyzerEngine.setNorm(norms);
       analyzerEngine.setLoopLimits(0, buffer.duration);
       // analyzerEngine.start();
-      // update waveform 
+      // update waveform
       loadedTargetBuffer = buffer;
       renderApp();
     }
@@ -173,8 +177,9 @@ async function main($container) {
   });
 
 
-  // audio analysis 
-  const mfcc = new Mfcc(analysisParams);
+  // audio analysis
+  const { mfccBands, mfccCoefs, mfccMinFreq, mfccMaxFreq, frameSize, sampleRate } = analysisParams;
+  const mfcc = new Mfcc(mfccBands, mfccCoefs, mfccMinFreq, mfccMaxFreq, frameSize, sampleRate);
     // realtime
   const analysisBuffer = new Float32Array(analysisParams.frameSize);
   for (let i = 0; i < analysisBuffer.length; i++) {
@@ -203,14 +208,14 @@ async function main($container) {
       if (analysisParams.hopSize < analysisParams.frameSize) {
         for (let i = 0; i < analysisBuffer.length - inputData.length; i++) {
           analysisBuffer[i] = analysisBuffer[i + inputData.length];
-        } 
+        }
         for (let i = 0; i < inputData.length; i++) {
-          analysisBuffer[i + analysisBuffer.length - inputData.length] = inputData[i]; 
-        } 
-      } else { 
+          analysisBuffer[i + analysisBuffer.length - inputData.length] = inputData[i];
+        }
+      } else {
         for (let i = 0; i < analysisBuffer.length; i++) {
           analysisBuffer[i] = inputData[i];
-        } 
+        }
       }
 
       const targetMfcc = mfcc.get(analysisBuffer);
@@ -257,7 +262,6 @@ async function main($container) {
   processor.connect(audioContext.destination);
   displaySignalProcessor.connect(audioContext.destination);
 
-    // offline
   class AnalyzerEngine {
     constructor(period, frameSize) {
       this.period = period;
@@ -296,6 +300,7 @@ async function main($container) {
 
     tick(time) {
       time = Math.max(time, audioContext.currentTime);
+
       if (this.active && this.buffer) {
         const bufferData = this.buffer.getChannelData(0);
         const idx = Math.floor(this.transportTime * this.buffer.sampleRate);
@@ -370,7 +375,7 @@ async function main($container) {
     });
   }
 
-  // groups 
+  // groups
   const groups = await client.stateManager.getCollection('group');
   groups.onAttach(() => renderApp());
   groups.onUpdate(() => renderApp());
@@ -426,7 +431,7 @@ async function main($container) {
           analyzerEngine.setNorm(value.data);
           analyzerEngine.setLoopLimits(0, buffer.duration);
           // analyzerEngine.start();
-          // update waveform 
+          // update waveform
           loadedTargetBuffer = buffer;
           renderApp();
           break;
@@ -502,10 +507,10 @@ async function main($container) {
     const now = audioContext.currentTime;
     const $selectCalibration = document.getElementById('select-calibration');
     let loadCalibrationBtnDisabled = true;
+
     if ($selectCalibration) {
       loadCalibrationBtnDisabled = !$selectCalibration.value || $selectCalibration.value === calibrationLoaded;
     }
-
 
     switch (inputMode) {
       case 'realtime': {
@@ -595,7 +600,7 @@ async function main($container) {
               }}
               ?disabled=${loadCalibrationBtnDisabled}
             >load</sc-button>
-            <p>loaded: ${calibrationLoaded}</p> 
+            <p>loaded: ${calibrationLoaded}</p>
           </div>
         `
         break;
@@ -673,7 +678,7 @@ async function main($container) {
               margin-right: 10px;
               flex-shrink: 0;
             "
-            value=${JSON.stringify(filesystemSoundbank.getTree())} 
+            value=${JSON.stringify(filesystemSoundbank.getTree())}
             @input=${e => controller.set({ loadAnalysisFile: e.detail.value.name }) }
           >
           </sc-filetree>
@@ -718,7 +723,7 @@ async function main($container) {
   function renderApp() {
     const now = audioContext.currentTime;
     const synthesisParams = ['volume', 'detune', 'grainPeriod', 'grainDuration', 'randomizer'];
-    
+
     render(html`
       <div class="controller-layout">
         <header>
@@ -844,7 +849,7 @@ async function main($container) {
                 }
                 return html`
                   <div style="
-                    display: flex; 
+                    display: flex;
                     flex-direction: row;
                     align-items: center;
                   ">
@@ -858,7 +863,7 @@ async function main($container) {
                     "
                     @release=${e => satellite({reboot: true})}
                     >reboot</sc-button>
-                    <sc-select 
+                    <sc-select
                       style="
                         flex-shrink: 0;
                       "
@@ -868,7 +873,7 @@ async function main($container) {
                       @change=${e => {
                         const groupName = e.detail.value;
                         const group = groups.find(group => group.get('name') === groupName);
-                        let groupId = group ? group.id : null;  
+                        let groupId = group ? group.id : null;
                         console.log(groupId)
                         satellite.set({group: groupId});
                         global.set({saveGroupsSatellitesMap: true});
@@ -926,7 +931,7 @@ async function main($container) {
               <h2 style="margin: 10px;">master controls</h2>
               <sc-button
                 style="
-                  
+
                   width: 50px;
                 "
                 ?selected=${showMasterControls}
@@ -962,7 +967,7 @@ async function main($container) {
                     ></sc-select>
                   </div>
                   ${synthesisParams.map(param => {
-                    const groupsSchema = groups.getSchema();
+                    const groupsSchema = groups.getDescription();
                     return html`
                       <div
                         style="
@@ -970,7 +975,7 @@ async function main($container) {
                         "
                       >
                         <p>${param}</p>
-                        <sc-slider 
+                        <sc-slider
                           id="master-${param}"
                           style="
                             width: 200px;
@@ -990,16 +995,16 @@ async function main($container) {
                     `
                   })}
                 </div>
-              ` 
+              `
               : nothing
             }
-            
+
             <sc-midi
               style="
                 margin: 10px 20px;
               "
             ></sc-midi>
-            
+
             <div style="
               flex-grow: 2;
               overflow: hidden;
@@ -1007,11 +1012,11 @@ async function main($container) {
               display: flex;
               align-content: flex-start;
               flex-wrap: wrap;
-            "> 
+            ">
               ${groups.map(group => {
                 return html`
-                  <div style="  
-                    height: 300px; 
+                  <div style="
+                    height: 300px;
                     width: 400px;
                     border: solid 2px var(--sw-lighter-background-color);
                     border-left: solid 5px ${group.get('color')};
@@ -1064,7 +1069,7 @@ async function main($container) {
                       ></sc-select>
                     </div>
                     ${synthesisParams.map(param => {
-                      const schema = group.getSchema();
+                      const schema = group.getDescription();
                       return html`
                         <div style="
                           display: flex;

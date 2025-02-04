@@ -1,74 +1,11 @@
-import {parentPort} from 'worker_threads';
-import createKDTree from 'static-kdtree';
-
-const analysisParams = {
-  frameSize: 1024,
-  hopSize: 512,
-  mfccBands: 24,
-  mfccCoefs: 12,
-  mfccMinFreq: 50,
-  mfccMaxFreq: 8000,
-};
-
-parentPort.on('message', e => {
-  const {type, data} = e;
-  if (type === 'analyze-soundfile') {
-    analysisParams.sampleRate = data.sampleRate;
-    const analyser = new Mfcc(analysisParams);  
-    const [mfccFrames, times, means, std, minRms, maxRms] = analyser.computeBufferMfcc(data.arrayData, analysisParams.hopSize);
-    const searchTree = createKDTree(mfccFrames);
-    const serializedTree = searchTree.serialize();
-    parentPort.postMessage({
-      type: 'analyse-soundfile',
-      data: {
-        filename: data.filename,
-        serializedTree,
-        mfccFrames,
-        times,
-        means,
-        std,
-        minRms,
-        maxRms,
-      }
-    });
-  }
-})
-
-// addEventListener('message', e => {
-//   const {type, data} = e.data;
-//   if (type === 'message') {
-//     postMessage({ 
-//       type: 'message', 
-//       data,
-//     });
-//   }
-//   if (type === 'analyze-source' || type === 'analyze-target') {
-//     console.log('begin analysis');
-//     const init = data.analysisInitData;
-//     const analyzer = new Mfcc(init.mfccBands, init.mfccCoefs, init.mfccMinFreq, init.mfccMaxFreq, init.frameSize, init.sampleRate);
-//     const [mfccFrames, times, means, std, minRms, maxRms] = analyzer.computeBufferMfcc(data.buffer, init.hopSize);
-//     postMessage({
-//       type,
-//       data: {
-//         means, 
-//         std,
-//         minRms,
-//         maxRms,
-//       }
-//     });
-//   }
-// });
-
-
-
-class Mfcc {
-  constructor(params) {
-    this.nbrBands = params.mfccBands;
-    this.nbrCoefs = params.mfccCoefs;
-    this.minFreq = params.mfccMinFreq;
-    this.maxFreq = params.mfccMaxFreq;
-    this.frameSize = params.frameSize;
-    this.sampleRate = params.sampleRate;
+export default class Mfcc {
+  constructor(nbrBands, nbrCoefs, minFreq, maxFreq, frameSize, sampleRate) {
+    this.nbrBands = nbrBands;
+    this.nbrCoefs = nbrCoefs;
+    this.minFreq = minFreq;
+    this.maxFreq = maxFreq;
+    this.frameSize = frameSize;
+    this.sampleRate = sampleRate;
 
     this.fft = new Fft('power', this.frameSize, this.frameSize, this.frameSize);
     this.mel = new Mel(this.frameSize / 2 + 1, this.nbrBands, true, 1, this.minFreq, this.maxFreq, this.sampleRate);
@@ -84,7 +21,7 @@ class Mfcc {
   }
 
   computeBufferMfcc(channelData, hopSize) {
-    console.log("analysing file");
+    console.log("analyzing file");
     const mfccFrames = [];
     const times = [];
     const means = new Float32Array(this.nbrCoefs);
@@ -112,10 +49,10 @@ class Mfcc {
       frameRms = Math.sqrt(frameRms/frame.length);
       if (frameRms > maxRms) {
         maxRms = frameRms;
-      } 
+      }
       if (frameRms < minRms) {
         minRms = frameRms;
-      } 
+      }
     }
     for (let j = 0; j < this.nbrCoefs; j++) {
       means[j] /= mfccFrames.length;
@@ -214,7 +151,6 @@ class Mel {
     var minLog = -480;
     if (this.log) scale *= this.nbrBands;
 
-
     for (var i = 0; i < this.nbrBands; i++) {
       var _melBandDescriptions$ = this.melBandDescriptions[i],
         startIndex = _melBandDescriptions$.startIndex,
@@ -224,7 +160,7 @@ class Mel {
 
       for (var j = 0; j < weights.length; j++) {
         value += weights[j] * data[startIndex + j];
-      } 
+      }
       if (scale !== 1) value *= scale;
 
       if (this.log) {
@@ -235,7 +171,6 @@ class Mel {
 
       melBands[i] = value;
     }
-    
 
     return melBands;
   }
@@ -307,6 +242,7 @@ function getMelBandWeights(nbrBins, nbrBands, sampleRate, minFreq, maxFreq) {
 
 class Fft {
   constructor(mode, frameSize, fftSize, windowSize) {
+    console.log(mode, frameSize, fftSize, windowSize);
     this.mode = mode;
     this.frameSize = frameSize;
     this.fftSize = fftSize;
@@ -370,7 +306,7 @@ class Fft {
       var _imagNy = this.imag[this.fftSize / 2];
       outData[this.fftSize / 2] = (_realNy * _realNy + _imagNy * _imagNy) * _norm;
 
- 
+
       for (var _i3 = 1, _j = this.fftSize - 1; _i3 < this.fftSize / 2; _i3++, _j--) {
         var _real = 0.5 * (this.real[_i3] + this.real[_j]);
         var _imag = 0.5 * (this.imag[_i3] - this.imag[_j]);
@@ -390,7 +326,7 @@ class FftNayuki {
 
     for (var i = 0; i < 32; i++) {
       if (1 << i == n) {
-        this.levels = i; 
+        this.levels = i;
       }
     }
 
@@ -474,5 +410,3 @@ function hannWindow(buffer, size, normCoefs) {
   normCoefs.linear = size / linSum;
   normCoefs.power = Math.sqrt(size / powSum);
 }
-
-
