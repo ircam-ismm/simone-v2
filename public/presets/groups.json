@@ -1,9 +1,34 @@
-[ {
-    "name": "dotpi-dev-053",
+[
+  {
+    "name": "dotpi-murmures-032",
     "color": "#000000"
   },
   {
-    "name": "dotpi-dev-054",
+    "name": "dotpi-murmures-073",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-036",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-066",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-033",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-052",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-034",
+    "color": "#000000"
+  },
+  {
+    "name": "dotpi-murmures-041",
     "color": "#000000"
   }
 ]

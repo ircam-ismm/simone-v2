@@ -1,10 +1,8 @@
 import os from 'node:os';
 import '@soundworks/helpers/polyfills.js';
 import { Client } from '@soundworks/core/client.js';
-import launcher from '@soundworks/helpers/launcher.js';
+import { launcher, loadConfig } from '@soundworks/helpers/node.js';
 import { execSync } from 'node:child_process';
-
-import { loadConfig } from '../../utils/load-config.js';
 
 import pluginFilesystem from '@soundworks/plugin-filesystem/client.js';
 
@@ -35,11 +33,6 @@ TODO:
 // - Issue Tracker:         https://github.com/collective-soundworks/soundworks/issues
 // - Wizard & Tools:        `npx soundworks`
 
-const audioContext = new AudioContext(); 
-
-const audioBufferLoader = new AudioBufferLoader(audioContext);
-
-
 const DEBUG = false;
 
 async function bootstrap() {
@@ -49,6 +42,11 @@ async function bootstrap() {
 
   const config = loadConfig(process.env.ENV, import.meta.url);
   const client = new Client(config);
+
+  const audioContext = new AudioContext(); 
+  const { useHttps, serverAddress, port } = config.env;
+  const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}`;
+  const audioBufferLoader = new AudioBufferLoader(audioContext, url);
 
   /**
    * Register some soundworks plugins, you will need to install the plugins
@@ -87,19 +85,20 @@ async function bootstrap() {
   // load buffers
   const buffers = {};
   for (const fileNode of filesystemSoundbank.getTree().children) {
-    const { useHttps, serverAddress, port } = config.env;
-    const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${fileNode.url}`;
+    // const { useHttps, serverAddress, port } = config.env;
+    // const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${fileNode.url}`;
     // const path = `${config.env.serverAddress}/${fileNode.url}`;
-    const buffer = await audioBufferLoader.load(url);
+    // console.log(fileNode);
+    const buffer = await audioBufferLoader.load(fileNode.path);
     buffers[fileNode.name] = buffer;
   }
 
   filesystemSoundbank.onUpdate(async updates => {
     for (const event of updates.events) {
       if (event.type === 'create') {
-        const { useHttps, serverAddress, port } = config.env;
-        const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${event.node.url}`;
-        const buffer = await audioBufferLoader.load(url);
+        // const { useHttps, serverAddress, port } = config.env;
+        // const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}${event.node.url}`;
+        const buffer = await audioBufferLoader.load(event.node.path);
         buffers[event.node.name] = buffer;
       }
       if (event.type === 'delete') {
