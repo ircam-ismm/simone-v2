@@ -15,6 +15,7 @@ html, body {
   min-height: 100vh;
   background-color: var(--sw-background-color);
   color: var(--sw-font-color);
+  margin: 0;
 }
 
 html {
@@ -75,5 +76,16 @@ body.loading {
 
   & > section {
     padding: 20px;
+  }
+
+  #mixing-wrapper {
+    position: absolute;
+    top: 30px;;
+    left: 0;
+    width: 100%;
+    padding: 6px;
+    background-color: #232323;
+    z-index: 200;
+    display: none;
   }
 }

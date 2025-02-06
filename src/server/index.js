@@ -2,13 +2,13 @@ import '@soundworks/helpers/polyfills.js';
 import { Server } from '@soundworks/core/server.js';
 // import { configureMaxClient } from '@soundworks/max'; // to be tested
 import { loadConfig, configureHttpRouter } from '@soundworks/helpers/server.js';
-import '../utils/catch-unhandled-errors.js';
 
 import fs from 'fs';
 import { Worker } from 'worker_threads';
 
-import pluginPlatformInit from '@soundworks/plugin-platform-init/server.js';
-import pluginFilesystem from '@soundworks/plugin-filesystem/server.js';
+import ServerPluginPlatformInit from '@soundworks/plugin-platform-init/server.js';
+import ServerPluginFilesystem from '@soundworks/plugin-filesystem/server.js';
+import ServerPluginMixing from '@soundworks/plugin-mixing/server.js';
 
 import globalSchema from './schemas/global.js';
 import controllerSchema from './schemas/controller.js';
@@ -49,22 +49,23 @@ const pathCalibration = 'public/calibration';
 const pathAnalysis = 'public/analysis-data';
 const pathPresets = 'public/presets';
 
-server.pluginManager.register('platform-init', pluginPlatformInit);
-server.pluginManager.register('filesystem-soundbank', pluginFilesystem, {
+server.pluginManager.register('platform-init', ServerPluginPlatformInit);
+server.pluginManager.register('filesystem-soundbank', ServerPluginFilesystem, {
   dirname: pathSoundbank,
   publicPath: 'soundbank'
 });
-server.pluginManager.register('filesystem-calibration', pluginFilesystem, {
+server.pluginManager.register('filesystem-calibration', ServerPluginFilesystem, {
   dirname: pathCalibration,
 });
-server.pluginManager.register('filesystem-analysis', pluginFilesystem, {
+server.pluginManager.register('filesystem-analysis', ServerPluginFilesystem, {
   dirname: pathAnalysis,
   publicPath: 'analysis-data'
 });
-server.pluginManager.register('filesystem-presets', pluginFilesystem, {
+server.pluginManager.register('filesystem-presets', ServerPluginFilesystem, {
   dirname: pathPresets,
   publicPath: 'presets'
 });
+server.pluginManager.register('mixing', ServerPluginMixing);
 
 server.stateManager.defineClass('global', globalSchema);
 server.stateManager.defineClass('controller', controllerSchema);

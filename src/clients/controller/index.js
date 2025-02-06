@@ -6,8 +6,9 @@ import launcher from '@soundworks/helpers/launcher.js';
 import { html, nothing, render } from 'lit';
 import '../components/sw-audit.js';
 
-import pluginPlatformInit from '@soundworks/plugin-platform-init/client.js';
-import pluginFilesystem from '@soundworks/plugin-filesystem/client.js';
+import ClientPluginPlatformInit from '@soundworks/plugin-platform-init/client.js';
+import ClientPluginFilesystem from '@soundworks/plugin-filesystem/client.js';
+import ClientPluginMixing from '@soundworks/plugin-mixing/client.js';
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
 import { Scheduler } from '@ircam/sc-scheduling';
@@ -30,6 +31,7 @@ import '@ircam/sc-components/sc-waveform.js';
 import '@ircam/sc-components/sc-dragndrop.js';
 import '@ircam/sc-components/sc-midi.js';
 import '@ircam/sc-components/sc-color-picker.js';
+import '@soundworks/plugin-mixing/components.js';
 
 
 // - General documentation: https://soundworks.dev/
@@ -57,9 +59,10 @@ const analysisParams = {
 async function main($container) {
   const client = new Client(config);
 
-  client.pluginManager.register('platform-init', pluginPlatformInit, { audioContext });
-  client.pluginManager.register('filesystem-soundbank', pluginFilesystem, {});
-  client.pluginManager.register('filesystem-calibration', pluginFilesystem, {});
+  client.pluginManager.register('platform-init', ClientPluginPlatformInit, { audioContext });
+  client.pluginManager.register('filesystem-soundbank', ClientPluginFilesystem, {});
+  client.pluginManager.register('filesystem-calibration', ClientPluginFilesystem, {});
+  client.pluginManager.register('mixing', ClientPluginMixing, { role: 'controller' });
 
   launcher.register(client, {
     initScreensContainer: $container,
@@ -74,20 +77,15 @@ async function main($container) {
   const filesystemCalibration = await client.pluginManager.get('filesystem-calibration');
   filesystemCalibration.onUpdate(() => renderApp());
 
+  const mixing = await client.pluginManager.get('mixing');
+
   const global = await client.stateManager.attach('global');
   const controller = await client.stateManager.create('controller');
 
 
   let inputMode = 'realtime';
 
-  // const res = await fetch('./mfcc.worker.js');
-  // const mfccWorkerString = await res.text();
-  // const workerBlob = new Blob([mfccWorkerString], { type: 'text/javascript' });
-  // const workerUrl = URL.createObjectURL(workerBlob);
-  const analysisWorker = new Worker('./mfcc.worker.js', {
-    type: 'module'
-  });
-
+  const analysisWorker = new Worker('./mfcc.worker.js', { type: 'module' });
   analysisWorker.postMessage({
     type: 'message',
     data: "worker says hello",
@@ -728,8 +726,18 @@ async function main($container) {
       <div class="controller-layout">
         <header>
           <h1>${client.config.app.name} | ${client.role}</h1>
+          <sc-icon
+            type="gear"
+            @click=${e => {
+              const target = document.querySelector('#mixing-wrapper')
+              target.style.display = target.style.display !== 'block' ? 'block' : 'none';
+            }}
+          ></sc-icon>
           <sw-audit .client="${client}"></sw-audit>
         </header>
+        <div id="mixing-wrapper">
+          <sw-plugin-mixing .plugin=${mixing}></sw-plugin-mixing>
+        </div>
         <!-- microphone and calibration -->
         <div style="
           border-bottom: solid 2px var(--sw-lighter-background-color);

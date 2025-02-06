@@ -4,26 +4,26 @@ import { Client } from '@soundworks/core/client.js';
 import { launcher, loadConfig } from '@soundworks/helpers/node.js';
 import { execSync } from 'node:child_process';
 
-import pluginFilesystem from '@soundworks/plugin-filesystem/client.js';
 
-import { Scheduler } from '@ircam/sc-scheduling'; 
+import ClientPluginFilesystem from '@soundworks/plugin-filesystem/client.js';
+import ClientPluginMixing from '@soundworks/plugin-mixing/client.js';
+
+import { Scheduler } from '@ircam/sc-scheduling';
 import SynthesisEngine from './SynthesisEngine.js';
-import LED from './led.js';
+import LED from './Led.js';
 
-import { 
+import {
   AudioContext,
-  DynamicsCompressorNode,
   GainNode,
-} from 'node-web-audio-api'; 
+} from 'node-web-audio-api';
 
 
 import { AudioBufferLoader } from '@ircam/sc-loader';
-
-import { performance } from 'node:perf_hooks';
+// import { performance } from 'node:perf_hooks';
 
 
 /*
-TODO: 
+TODO:
 
 - load from local if file exists
 */
@@ -36,51 +36,35 @@ TODO:
 const DEBUG = false;
 
 async function bootstrap() {
-  /**
-   * Load configuration from config files and create the soundworks client
-   */
+  const audioContext = new AudioContext();
+  const audioBufferLoader = new AudioBufferLoader(audioContext);
+  const hostname = os.hostname();
 
   const config = loadConfig(process.env.ENV, import.meta.url);
   const client = new Client(config);
-
-  const audioContext = new AudioContext(); 
-  const { useHttps, serverAddress, port } = config.env;
-  const url = `${useHttps ? 'https' : 'http'}://${serverAddress}:${port}`;
-  const audioBufferLoader = new AudioBufferLoader(audioContext, url);
-
-  /**
-   * Register some soundworks plugins, you will need to install the plugins
-   * before hand (run `npx soundworks` for help)
-   */
-  // client.pluginManager.register('my-plugin', plugin);
-  // client.pluginManager.register('filesystem', pluginFilesystem, {});
-  
-  client.pluginManager.register('filesystem-soundbank', pluginFilesystem, {});
-  client.pluginManager.register('filesystem-analysis', pluginFilesystem, {});
-
-  /**
-   * Register the soundworks client into the launcher
-   *
-   * Automatically restarts the process when the socket closes or when an
-   * uncaught error occurs in the program.
-   */
   launcher.register(client);
 
-  /**
-   * Launch application
-   */
+  client.pluginManager.register('filesystem-soundbank', ClientPluginFilesystem, {});
+  client.pluginManager.register('filesystem-analysis', ClientPluginFilesystem, {});
+  client.pluginManager.register('mixing', ClientPluginMixing, {
+    role: 'track',
+    audioContext,
+    label: hostname,
+  });
+
   await client.start();
 
   console.log('loading....')
 
   const filesystemSoundbank = await client.pluginManager.get('filesystem-soundbank');
-  
+
   const controllers = await client.stateManager.getCollection('controller');
   const global = await client.stateManager.attach('global');
 
+  const mixing = await client.pluginManager.get('mixing');
+
   let group = null;
   let groupSource = null;
-
 
   // load buffers
   const buffers = {};
@@ -107,7 +91,7 @@ async function bootstrap() {
     }
   });
 
-  //synthesis
+  // synthesis
   const scheduler = new Scheduler(() => audioContext.currentTime);
   const synthesisEngine = new SynthesisEngine(audioContext);
 
@@ -115,19 +99,12 @@ async function bootstrap() {
 
   // audio path
   const outputNode = new GainNode(audioContext);
-  // const compressor = new DynamicsCompressorNode(audioContext, {
-  //   threshold: -30,
-  //   knee: 0.1,
-  //   ratio: 2,
-  //   attack: 0.01,
-  //   release: 0.1,
-  // });
   synthesisEngine.connect(outputNode);
-  // compressor.connect(outputNode);
-  outputNode.connect(audioContext.destination);
+  outputNode.connect(mixing.input);
 
   // led
-  const led = new LED({ debug: DEBUG, verbose: false });
+  const isEmulated = !hostname.startsWith('dotpi-');
+  const led = new LED({ emulated: isEmulated, verbose: false });
   led.init(audioContext, scheduler, outputNode);
 
   global.onUpdate(updates => {
