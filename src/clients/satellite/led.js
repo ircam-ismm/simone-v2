@@ -27,7 +27,7 @@ export default class LED {
       return;
     }
 
-    const ledClient = Client.create();
+    const ledClient = await Client.create();
     const analyser = new AnalyserNode(audioContext, { fftSize: 4096 });
     const analyserData = new Float32Array(analyser.fftSize);
     inputNode.connect(analyser);
