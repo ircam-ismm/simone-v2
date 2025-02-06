@@ -11,7 +11,6 @@
     "build:production": "npm run clean && sass src/clients/styles:.build/public/css && soundworks-build -b -m",
     "clean": "soundworks-build -D",
     "dev": "npm run build && (concurrently -i -p \"none\" \"npm run watch:inspect server\" \"soundworks-build -b -w\" \"npm run watch:sass\")",
-    "postinstall": "soundworks-build -C",
     "start": "node .build/server/index.js",
     "watch": "soundworks-build -p",
     "watch:inspect": "soundworks-build -i -p",
@@ -20,7 +19,7 @@
   },
   "dependencies": {
     "@dotpi/led": "^3.1.2",
-    "@ircam/sc-components": "^3.2.5",
+    "@ircam/sc-components": "^3.2.7",
     "@ircam/sc-loader": "^1.1.0",
     "@ircam/sc-scheduling": "^1.0.0",
     "@ircam/sc-utils": "^1.9.0",

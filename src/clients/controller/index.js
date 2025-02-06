@@ -726,13 +726,16 @@ async function main($container) {
       <div class="controller-layout">
         <header>
           <h1>${client.config.app.name} | ${client.role}</h1>
-          <sc-icon
-            type="gear"
-            @click=${e => {
-              const target = document.querySelector('#mixing-wrapper')
-              target.style.display = target.style.display !== 'block' ? 'block' : 'none';
-            }}
-          ></sc-icon>
+          <div>
+            <sc-midi></sc-midi>
+            <sc-icon
+              type="gear"
+              @click=${e => {
+                const target = document.querySelector('#mixing-wrapper')
+                target.style.display = target.style.display !== 'block' ? 'block' : 'none';
+              }}
+            ></sc-icon>
+          </div>
           <sw-audit .client="${client}"></sw-audit>
         </header>
         <div id="mixing-wrapper">
@@ -1006,13 +1009,6 @@ async function main($container) {
               `
               : nothing
             }
-
-            <sc-midi
-              style="
-                margin: 10px 20px;
-              "
-            ></sc-midi>
-
             <div style="
               flex-grow: 2;
               overflow: hidden;
