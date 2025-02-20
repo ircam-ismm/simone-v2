@@ -499,7 +499,7 @@ async function main($container) {
   }
 
   // render
-  let showMasterControls = false;
+  let showMasterControls = true;
 
   function renderInputPanel() {
     const now = audioContext.currentTime;
@@ -962,7 +962,19 @@ async function main($container) {
                   padding: 0 10px 5px;
                   border-bottom: solid 2px var(--sw-lighter-background-color);
                 ">
-
+                  <div style="
+                    margin-right: 12px;
+                    display: flex;
+                    align-items: flex-end;
+                  ">
+                    <sc-transport
+                      id="groups-transport"
+                      style="height: 40px;"
+                      .buttons=${["play", "stop"]}
+                      @input=${e => groups.set({ playing: e.detail.value === 'play' })}
+                      value="stop"
+                    ></sc-transport>
+                  </div>
                   <div style="
                     margin-right: 10px;
                   ">
@@ -1048,7 +1060,7 @@ async function main($container) {
                           height: 40px;
                         "
                         .buttons=${["play", "stop"]}
-                        @change=${e => group.set({playing: e.detail.value === 'play' })}
+                        @change=${e => group.set({ playing: e.detail.value === 'play' })}
                         value=${group.get('playing') ? 'play' : 'stop'}
                       ></sc-transport>
                     </div>
