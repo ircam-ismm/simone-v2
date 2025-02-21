@@ -457,6 +457,8 @@ async function main($container) {
     renderApp();
   });
 
+  //
+  const selectSourcesTimeoutIds = new Set();
   // presets
   const nPresets = 16;
   const presets = global.get('presets');
@@ -982,12 +984,26 @@ async function main($container) {
                     <sc-select
                       options=${JSON.stringify(filesystemSoundbank.getTree().children.map(e => e.name))}
                       placeholder="select source"
-                      @change=${e => groups.forEach(group => {
+                      @change=${e => {
+                        selectSourcesTimeoutIds.forEach(id => clearTimeout(id));
+                        selectSourcesTimeoutIds.clear();
+                        const duration = document.querySelector('#select-source-duration').value;
+
                         if (e.detail.value) {
-                          group.set({ sourceName: e.detail.value })
+                          groups.forEach(group => {
+                            const timeoutId = setTimeout(() => {
+                              group.set({ sourceName: e.detail.value })
+                            }, Math.random() * duration * 1000);
+                            selectSourcesTimeoutIds.add(timeoutId);
+                          });
                         }
-                      })}
+                      }}
                     ></sc-select>
+                    <sc-number
+                      id="select-source-duration"
+                      min="0"
+                      value="0"
+                    ></sc-number>
                   </div>
                   ${synthesisParams.map(param => {
                     const groupsSchema = groups.getDescription();
