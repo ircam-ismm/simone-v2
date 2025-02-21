@@ -1061,7 +1061,7 @@ async function main($container) {
                       flex-direction: row;
                       justify-content: space-between;
                       align-items: center;
-                      margin-bottom: 20px;
+                      margin-bottom: 4px;
                     ">
                       <div>
                         <h2 style="
