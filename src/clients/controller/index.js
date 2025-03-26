@@ -1048,7 +1048,7 @@ async function main($container) {
               ${groups.map(group => {
                 return html`
                   <div style="
-                    height: 300px;
+                    height: 320px;
                     width: 400px;
                     border: solid 2px var(--sw-lighter-background-color);
                     border-left: solid 5px ${group.get('color')};

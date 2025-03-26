@@ -6,11 +6,13 @@ export default {
   },
   ledColor: {
     type: 'string',
-    default: '#ffffff',
+    default: '#00fa04',
   },
   ledIntensity: {
     type: 'float',
-    default: 0,
+    default: 0.1,
+    min: 0,
+    max: 1,
   },
   createGroup: {
     type: 'boolean',

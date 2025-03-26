@@ -38,6 +38,10 @@ body.loading {
   background-repeat: no-repeat;
 }
 
+body.controller {
+  background-color: #006c02;
+}
+
 .simple-layout {
   display: block;
   flex-grow: 1;
